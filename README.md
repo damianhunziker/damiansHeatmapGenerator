@@ -1,5 +1,7 @@
 # Heatmap Generator
 
+![Example Heatmap](example-heatmap.png)
+
 Welcome to the Heatmap Generator, a sophisticated tool designed to analyze trading strategies and visualize their performance through interactive heatmaps.
 
 ## Project Background
@@ -114,4 +116,4 @@ This project was developed with extensive use of AI, which provided valuable ins
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License - see the [LICENSE](LICENSE) file for details.
