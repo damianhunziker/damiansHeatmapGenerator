@@ -1,8 +1,8 @@
-# Heatmap Generator
+# Damian's Heatmap Generator
 
 ![Example Heatmap](example-heatmap.png)
 
-Welcome to the Heatmap Generator, a sophisticated tool designed to analyze trading strategies and visualize their performance through interactive heatmaps.
+Welcome to Damian's Heatmap Generator, a sophisticated tool designed to analyze trading strategies and visualize their performance through interactive heatmaps.
 
 ## Project Background
 
@@ -10,7 +10,7 @@ As a PHP open-source developer venturing into Python, I created this project in 
 
 ## Overview
 
-The Heatmap Generator allows users to:
+Damian's Heatmap Generator allows users to:
 - Convert trading strategies from various platforms to Python using AI
 - Verify strategy performance through profit/loss analysis
 - Compare trade signals with original strategies
