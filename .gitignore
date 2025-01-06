@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+.vscode/
+ohlc_cache/
+html_cache/
+html/
+images/
+pnl_cache/
+classes/strategies/*
+!classes/strategies/macd_strategy.py
