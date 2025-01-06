@@ -154,7 +154,7 @@ class SMACrossoverStrategy(BaseStrategy):
         entry_fee = position_size * self.fee_pct
         exit_fee = (position_size + gross_profit) * self.fee_pct
         total_fee = entry_fee + exit_fee
-        net_profit = gross_profit - total_fee
+        net_profit = gross_profit - total_fee # gross_profit - total_fee
         
         return (entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, total_fee, trade_type)
     
