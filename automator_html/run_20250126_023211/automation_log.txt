@@ -1,0 +1,15 @@
+Heatmap Automation Run - 20250126_023211
+==================================================
+
+Configuration:
+Interval: 4h
+Initial Equity: 1000
+Fee Percentage: 0.04
+Date Range: 2020-01-01 to 2021-01-01
+Strategy: KAMAStrategy
+
+Processing pairs:
+
+BTCUSDT - 2025-01-26 02:32:11
+
+ETHUSDT - 2025-01-26 02:33:23

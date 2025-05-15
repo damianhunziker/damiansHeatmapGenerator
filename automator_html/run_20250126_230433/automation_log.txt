@@ -1,0 +1,31 @@
+Heatmap Automation Run - 20250126_230433
+==================================================
+
+Configuration:
+Interval: 4h
+Initial Equity: 1000
+Fee Percentage: 0.04
+Date Range: 2020-09-17 to 2021-01-25
+Strategy: KAMAStrategy
+
+Processing pairs:
+
+Error processing BTCUSDT: 'primary'
+
+Error processing ETHUSDT: 'primary'
+
+Error processing BNBUSDT: 'primary'
+
+Error processing SOLUSDT: 'primary'
+
+Error processing DOGEUSDT: 'primary'
+
+Error processing AVAXUSDT: 'primary'
+
+Error processing LINKUSDT: 'primary'
+
+Error processing SHIBUSDT: 'primary'
+
+Error processing APEUSDT: 'primary'
+
+Error processing TONUSDT: 'primary'

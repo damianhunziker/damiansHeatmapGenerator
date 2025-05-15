@@ -1,7 +1,7 @@
 import altair as alt
 import pandas as pd
 import numpy as np
-from strategy_utils import get_user_inputs, fetch_data, get_parameter_ranges, print_logo
+from strategy_utils import get_user_inputs, fetch_data, get_parameter_ranges, print_logo, create_performance_chart
 from classes.trade_analyzer import TradeAnalyzer
 import itertools
 from tqdm import tqdm
@@ -11,25 +11,35 @@ import webbrowser
 import altair_saver
 import matplotlib.pyplot as plt
 
-def analyze_strategy(params, data, strategy_class, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, param_ranges):
-    # Use last_n_candles_analyze to calculate indicators
-    data_for_indicators = data.iloc[-(last_n_candles_analyze + last_n_candles_display):]
-    
+def analyze_strategy(params, timeframe_data, strategy_class, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, param_ranges, start_date=None, end_date=None):
+    """Analyze strategy with given parameters"""
+    # Initialize strategy with parameters
     strategy_params = dict(zip(param_ranges.keys(), params))
     strategy_params.update({
         'initial_equity': initial_equity,
         'fee_pct': fee_pct
     })
-
-    analyzer = TradeAnalyzer(strategy_class, strategy_params)
     
-    # Use last_n_candles_display to generate entry and exit signals
-    trades, _ = analyzer.analyze_data(data_for_indicators, last_n_candles_display, silent=True)
+    # Initialize strategy with timeframe data
+    strategy = strategy_class(**strategy_params)
+    strategy.timeframe_data = timeframe_data
+    
+    # Create analyzer with strategy
+    analyzer = TradeAnalyzer(strategy, strategy_params)
+    
+    # Get primary timeframe data
+    data = timeframe_data['primary']['data']
+    
+    # Analyze data and get trades
+    trades, _ = analyzer.analyze_data(data, last_n_candles_analyze, last_n_candles_display)
 
     # Calculate metrics using the TradeAnalyzer
     equity_curve = [initial_equity]
+    trade_timestamps = []
+    
     for trade in trades:
         equity_curve.append(equity_curve[-1] + trade[4])
+        trade_timestamps.append(trade[1])
 
     metrics = analyzer.calculate_metrics(equity_curve, trades)
     
@@ -38,57 +48,103 @@ def analyze_strategy(params, data, strategy_class, initial_equity, fee_pct, last
     drawdown_pct = max_dd if max_dd > 0 else 0
 
     return (
-        metrics['profit_pct'], 
-        metrics['total_net_profit'], 
-        len(trades), 
-        metrics['win_rate'], 
-        metrics['profit_factor'], 
-        metrics['max_drawdown'], 
-        drawdown_pct,  # Use the processed drawdown value
-        metrics['avg_trade_profit'], 
-        metrics['avg_trade_profit_pct'], 
-        metrics['avg_trade_duration'], 
+        metrics['profit_pct'],
+        metrics['total_net_profit'],
+        len(trades),
+        metrics['win_rate'],
+        metrics['profit_factor'],
+        metrics['max_drawdown'],
+        drawdown_pct,
+        metrics['avg_trade_profit'],
+        metrics['avg_trade_profit_pct'],
+        metrics['avg_trade_duration'],
         metrics['sharpe_ratio'],
         metrics['sortino_ratio'],
         metrics['volatility'],
-        equity_curve
+        equity_curve,
+        trade_timestamps
     )
 
 def analyze_strategy_wrapper(args):
     return analyze_strategy(*args)
 
-
 def create_tooltip_fields(param_ranges):
     """Helper function to create common tooltip fields."""
     return [
+        alt.Tooltip('profit:Q', title='**Profit %**', format='.2f'),
+        alt.Tooltip('sharpe_ratio:Q', title='**Sharpe Ratio**', format='.2f'),
+        alt.Tooltip('drawdown_pct:Q', title='**Max Drawdown %**', format='.2f'),
         alt.Tooltip('x:O', title=list(param_ranges.keys())[0]),
         alt.Tooltip('y:O', title=list(param_ranges.keys())[1]),
-        alt.Tooltip('net_profit:Q', title='Net Profit'),
+        alt.Tooltip('net_profit:Q', title='Net Profit $', format=',.2f'),
         alt.Tooltip('num_trades:Q', title='Number of Trades'),
-        alt.Tooltip('win_rate:Q', title='Win Rate'),
-        alt.Tooltip('profit_factor:Q', title='Profit Factor'),
-        alt.Tooltip('drawdown:Q', title='Max Drawdown'),
-        alt.Tooltip('drawdown_pct:Q', title='**Max Drawdown %**'),
-        alt.Tooltip('avg_trade_profit:Q', title='Avg Trade Profit'),
-        alt.Tooltip('avg_trade_profit_pct:Q', title='Avg Trade Profit %'),
+        alt.Tooltip('win_rate:Q', title='Win Rate', format='.2%'),
+        alt.Tooltip('profit_factor:Q', title='Profit Factor', format='.2f'),
+        alt.Tooltip('drawdown:Q', title='Max Drawdown $', format=',.2f'),
+        alt.Tooltip('avg_trade_profit:Q', title='Avg Trade Profit $', format=',.2f'),
+        alt.Tooltip('avg_trade_profit_pct:Q', title='Avg Trade Profit %', format='.2f'),
         alt.Tooltip('avg_trade_duration:Q', title='Avg Trade Duration'),
-        alt.Tooltip('sharpe_ratio:Q', title='Sharpe Ratio'),
+        alt.Tooltip('volatility:Q', title='Volatility', format='.2f'),
         alt.Tooltip('sortino_ratio:Q', title='Sortino Ratio'),
-        alt.Tooltip('volatility:Q', title='Volatility'),
         alt.Tooltip('pnl_image:N', title='PnL Image')
     ]
 
 def generate_pnl_image(args):
-    """Helper function to generate PnL images in parallel"""
-    idx, params, equity_curve = args
-    plt.figure()
-    plt.plot(equity_curve)
-    plt.title(f'PnL for params: {params}')
-    plt.xlabel('Trade Number')
-    plt.ylabel('Equity')
-    image_path = f'pnl_cache/pnl_image_{idx}.png'
-    plt.savefig(image_path)
-    plt.close()
+    """Helper function to generate performance comparison chart"""
+    idx, params, equity_curve, full_price_data, start_idx, trade_timestamps, data = args
+    
+    # Check if there are any trades
+    if not trade_timestamps:
+        # Return a default image path with updated directory structure
+        image_path = os.path.join('html_cache/pnl_images', f'no_trades_{idx}.png')
+        plt.figure()
+        plt.text(0.5, 0.5, 'No trades in selected period', 
+                horizontalalignment='center', verticalalignment='center')
+        plt.savefig(image_path)
+        plt.close()
+        return idx, image_path
+    
+    # Konvertiere die Zeitstempel in DataFrame-Indizes
+    df = pd.DataFrame({'price': full_price_data})
+    df.index = data.index  # Verwende den gleichen Index wie das originale Dataframe
+    
+    # Hole die Positionen der Zeitstempel im Index
+    trade_indices = [df.index.get_loc(ts) for ts in trade_timestamps]
+
+    
+    # Berechne prozentuale Änderungen für PnL
+    initial_equity = equity_curve[0]
+    pnl_performance = [(eq/initial_equity - 1) * 100 for eq in equity_curve]  # In Prozent
+    
+    # Hole die entsprechenden Preise zu den Trade-Indizes
+    prices_at_trades = [full_price_data[idx] for idx in trade_indices]
+    
+    # Berechne Buy & Hold Performance basierend auf den Trade-Zeitpunkten
+    initial_price = prices_at_trades[0]
+    buy_hold = [(price/initial_price - 1) * 100 for price in prices_at_trades]  # In Prozent
+    
+    # Stelle sicher, dass alle Listen die gleiche Länge haben
+    min_len = min(len(trade_timestamps), len(pnl_performance))
+    trade_timestamps = trade_timestamps[:min_len]
+    pnl_performance = pnl_performance[:min_len]
+    buy_hold = buy_hold[:min_len]
+    
+    # Berechne Drawdown (bleibt in Prozent)
+    peak = np.maximum.accumulate([x/100 + 1 for x in pnl_performance])
+    drawdown = (np.array([x/100 + 1 for x in pnl_performance]) - peak) / peak * 100
+
+    
+    # Generiere Chart als Bild mit den originalen Zeitstempeln
+    image_path = create_performance_chart(
+        timestamps=trade_timestamps,
+        pnl_performance=pnl_performance,
+        buy_hold=buy_hold,
+        drawdown=drawdown,
+        output_type='image',
+        params=idx,
+        base_dir='html_cache/pnl_images'
+    )
+    
     return idx, image_path
 
 def open_file(file_path):
@@ -112,44 +168,60 @@ def open_file(file_path):
         print(f"Could not open file automatically: {e}")
         print(f"Please open the file manually: {file_path}")
 
-def create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, interval, asset, strategy_name):
+def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, interval, asset, strategy_name, start_date=None, end_date=None):
     """Creates a heatmap of strategy results for different parameter combinations"""
     print("\nCreating Heatmap...")
+    
+    # Ensure directories exist with correct structure
+    os.makedirs("html_cache/pnl_images", exist_ok=True)
+    
+    # Print start and end dates
+    print(f"\nAnalysis Period:")
+    print(f"Start Date: {start_date}")
+    print(f"End Date: {end_date}")
+    
+    # Get primary timeframe data
+    data = timeframe_data['primary']['data']
     
     # Generate all possible parameter combinations
     param_combinations = list(itertools.product(*param_ranges.values()))
     
-    print(f"There are {len(param_combinations)} possible parameter combinations.")
+    print(f"\nThere are {len(param_combinations)} possible parameter combinations.")
 
     with multiprocessing.Pool() as pool:
-        args_list = [(params, data, strategy_class, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, param_ranges) for params in param_combinations]
-        results = list(tqdm(pool.imap(analyze_strategy_wrapper, args_list), total=len(param_combinations), desc="Analyzing strategies"))
+        args_list = [(params, timeframe_data, strategy_class, initial_equity, fee_pct, 
+                     last_n_candles_analyze, last_n_candles_display, param_ranges, 
+                     start_date, end_date) for params in param_combinations]
+        results = list(tqdm(pool.imap(analyze_strategy_wrapper, args_list), 
+                          total=len(param_combinations), desc="Analyzing strategies"))
     
     # Ensure the pnl_cache directory exists
     os.makedirs('pnl_cache', exist_ok=True)
 
-    # Calculate the investigation period using the display period
-    start_date = data.index[-last_n_candles_display]
-    end_date = data.index[-1]
-
     # Prepare arguments for parallel image generation
-    image_args = [(idx, params, result[-1]) for idx, (params, result) in enumerate(zip(param_combinations, results))]
+    image_args = [
+        (idx, params, result[-2], data['price_close'].values, len(data) - len(result[-2]), result[-1], data)
+        for idx, (params, result) in enumerate(zip(param_combinations, results))
+    ]
     
     # Generate images in parallel
     print("\nGenerating PnL images...")
     with multiprocessing.Pool() as pool:
-        image_results = list(tqdm(pool.imap(generate_pnl_image, image_args), 
-                                total=len(image_args), 
-                                desc="Creating PnL images"))
+        image_results = list(tqdm(pool.imap(generate_pnl_image, image_args),
+                            total=len(image_args),
+                            desc="Creating PnL images"))
+    
+    # Update image paths to use relative path from html directory
+    image_paths = {idx: f"pnl_images/{os.path.basename(path)}" for idx, path in image_results}
     
     # Create HTML image elements
     image_elements = ""
-    for idx, image_path in image_results:
-        image_elements += f'<img id="pnl-img-{idx}" src="../{image_path}" alt="PnL Image" style="display:none;" width="70%">\n'
+    for idx, image_path in image_paths.items():  # Changed from .values() to .items()
+        image_elements += f'<img id="pnl-img-{idx}" src="{image_path}" alt="PnL Image" style="display:none;" width="70%">\n'
 
     # Create a DataFrame to store profits and parameters
     results_data = []
-    for idx, ((params, result), (_, image_path)) in enumerate(zip(zip(param_combinations, results), image_results)):
+    for idx, ((params, result), (_, image_path)) in enumerate(zip(zip(param_combinations, results), image_paths.items())):
         results_data.append({
             'x': params[0],
             'y': params[1],
@@ -171,15 +243,7 @@ def create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, 
 
     df = pd.DataFrame(results_data)
 
-    # Handle invalid parameter combinations (where slow_length <= length)
-    mask_invalid = df['x'] >= df['y']  # Create mask for invalid combinations
-    
-    # Set invalid combinations to None
-    df.loc[mask_invalid, 'drawdown_pct'] = None
-    df.loc[mask_invalid, 'profit'] = None
-    df.loc[mask_invalid, 'sharpe_ratio'] = None
-    
-    # Determine color scale domains (using only valid combinations)
+    # Determine color scale domains (using all combinations)
     profit_domain = [df['profit'].min(), df['profit'].max()]
     sharpe_domain = [df['sharpe_ratio'].min(), df['sharpe_ratio'].max()]
     drawdown_domain = [df['drawdown_pct'].min(), df['drawdown_pct'].max()]
@@ -191,10 +255,7 @@ def create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, 
         color=alt.Color('profit:Q', 
                        scale=alt.Scale(domain=profit_domain, scheme='viridis'), 
                        title='Profit %'),
-        tooltip=[
-            alt.Tooltip('profit:Q', title='**Profit %**'),
-            *create_tooltip_fields(param_ranges)
-        ]
+        tooltip=create_tooltip_fields(param_ranges)
     ).properties(
         title=f'Strategy Results Heatmap: {strategy_name} - Profit',
         width=300,
@@ -208,10 +269,7 @@ def create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, 
         color=alt.Color('sharpe_ratio:Q', 
                        scale=alt.Scale(domain=sharpe_domain, scheme='plasma'), 
                        title='Sharpe Ratio'),
-        tooltip=[
-            alt.Tooltip('sharpe_ratio:Q', title='**Sharpe Ratio**'),
-            *create_tooltip_fields(param_ranges)
-        ]
+        tooltip=create_tooltip_fields(param_ranges)
     ).properties(
         title=f'Strategy Results Heatmap: {strategy_name} - Sharpe Ratio',
         width=300,
@@ -226,13 +284,10 @@ def create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, 
                        scale=alt.Scale(
                            domain=drawdown_domain,
                            scheme='inferno',
-                           reverse=True  # Keeps yellow for best (lowest) drawdown
+                           reverse=True
                        ),
                        title='Max Drawdown %'),
-        tooltip=[
-            alt.Tooltip('drawdown_pct:Q', title='**Max Drawdown %**'),
-            *create_tooltip_fields(param_ranges)
-        ]
+        tooltip=create_tooltip_fields(param_ranges)
     ).properties(
         title=f'Strategy Results Heatmap: {strategy_name} - Max Drawdown',
         width=300,
@@ -245,7 +300,7 @@ def create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, 
     )
 
     # Create the html directory if it doesn't exist
-    os.makedirs('html', exist_ok=True)
+    os.makedirs('html_cache', exist_ok=True)
 
     # Construct the file name using the strategy name and min/max values of the first two parameter ranges
     param_keys = list(param_ranges.keys())
@@ -253,7 +308,7 @@ def create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, 
     param1_min, param1_max = min(param_ranges[param1_name]), max(param_ranges[param1_name])
     param2_min, param2_max = min(param_ranges[param2_name]), max(param_ranges[param2_name])
     file_name = f"{strategy_name}_{asset}_{interval}_{param1_name}_{param1_min}-{param1_max}_{param2_name}_{param2_min}-{param2_max}_candles_{last_n_candles_display}.html"
-    file_path = os.path.join('html', file_name)
+    file_path = os.path.join('html_cache', file_name)
 
     # Save the combined heatmap as an HTML file with the correct format
     try:
@@ -371,7 +426,7 @@ def create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, 
         file.write(html_content)
 
     print(f"\nHeatmap saved as: {file_path}")
-    open_file(file_path)  # Use the new open_file function instead of os.system
+    open_file(file_path)
 
 if __name__ == "__main__":
     print_logo()
@@ -379,15 +434,23 @@ if __name__ == "__main__":
     print("HEATMAP - Heatmap Generator and Strategy Backtester")
     
     # Get user inputs
-    asset, interval, initial_equity, last_n_candles_display, lookback_candles, fee_pct, strategy_name, strategy_class = get_user_inputs()
+    user_inputs = get_user_inputs()
     
     # Get parameter ranges for the heatmap
-    param_ranges = get_parameter_ranges(strategy_class)
+    param_ranges = get_parameter_ranges(user_inputs['strategy_class'])
     
-    # Load data
-    data = fetch_data(asset, interval)
-
-    print("lookback_candles", lookback_candles)
-
     # Create heatmap
-    create_heatmap(data, strategy_class, param_ranges, initial_equity, fee_pct, lookback_candles, last_n_candles_display, interval, asset, strategy_name)
+    create_heatmap(
+        user_inputs['timeframe_data'],
+        user_inputs['strategy_class'],
+        param_ranges,
+        user_inputs['initial_equity'],
+        user_inputs['fee_pct'],
+        user_inputs['lookback_candles'],
+        user_inputs['end_lookback_candles'],
+        user_inputs['interval'],
+        user_inputs['asset'],
+        user_inputs['strategy_name'],
+        user_inputs['start_date'],
+        user_inputs['end_date']
+    )

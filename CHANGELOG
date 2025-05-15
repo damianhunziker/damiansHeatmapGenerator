@@ -1,0 +1,34 @@
+# Changelog
+
+## 0.0.2
+
+### Added
+- New strategy directories in .gitignore (/live_strategies/, /test/)
+- Implementation of start and end date functionality for more precise timeframe analysis
+- Price normalization for small values in OHLCFetcher
+- Improved performance visualization with separate subplots for profit/loss
+- New create_performance_chart function for unified chart generation
+- Buy & Hold comparison in performance charts
+- Drawdown visualization in percentage
+
+### Changed
+- Overhaul of user input with improved input handling
+- Modernization of heatmap generation with better tooltips and formatting
+- Restructuring of data caching logic
+- Improved error handling for date inputs
+- Optimization of parameter validation
+- Revision of performance metrics display
+- Adjustment of color schemes for better visualization
+
+### Improved
+- Better handling of time series data
+- More efficient parallel processing for heatmap generation
+- Enhanced date validation and formatting
+- Optimized memory usage for image generation
+- Improved HTML output with formatted display
+
+### Fixed
+- Correction of drawdown calculation
+- Resolution of timing issues in parallel processing
+- Improvement of cache handling logic
+- Fixed image generation for PnL charts

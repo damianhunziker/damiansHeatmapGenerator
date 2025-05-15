@@ -1,0 +1,15 @@
+Heatmap Automation Run - 20250126_015057
+==================================================
+
+Configuration:
+Interval: 4h
+Initial Equity: 1000
+Fee Percentage: 0.04
+Date Range: 2023-01-01 to 2024-01-01
+Strategy: SSLStrategy
+
+Processing pairs:
+
+BTCUSDT - 2025-01-26 01:50:57
+
+ETHUSDT - 2025-01-26 01:52:12

@@ -4,6 +4,7 @@ import os
 import time
 from datetime import timedelta
 from decimal import Decimal
+import numpy as np
 
 class OHLCFetcher:
     def __init__(self, api_key=None):
@@ -17,7 +18,27 @@ class OHLCFetcher:
         # Check cache first
         if os.path.exists(cache_file):
             print(f"Loading data from cache: {cache_file}")
-            return pd.read_csv(cache_file, index_col='time_period_start', parse_dates=True)
+            df = pd.read_csv(cache_file, index_col='time_period_start', parse_dates=True)
+            
+            # Normalisiere die Preise wenn nötig
+            price_cols = ['price_open', 'price_high', 'price_low', 'price_close']
+            min_price = min(df[price_cols].min())
+            
+            if min_price < 0.1:
+                # Berechne den Multiplikator
+                multiplier = 10 ** (abs(int(np.log10(min_price))) + 1)
+                print(f"Normalizing prices with multiplier: {multiplier}")
+                
+                # Multipliziere alle Preisspalten
+                for col in price_cols:
+                    df[col] = df[col] * multiplier
+                
+                # Speichere den Multiplikator in den Metadaten
+                df.attrs['price_multiplier'] = multiplier
+            else:
+                df.attrs['price_multiplier'] = 1
+                
+            return df
 
         # If not in cache, fetch from Binance API
         print("Fetching data from Binance API...")
@@ -25,6 +46,24 @@ class OHLCFetcher:
 
         # Convert to CoinAPI format
         df = self._convert_to_coinapi_format(df)
+        
+        # Normalisiere die Preise wenn nötig
+        price_cols = ['price_open', 'price_high', 'price_low', 'price_close']
+        min_price = min(df[price_cols].min())
+        
+        if min_price < 0.1:
+            # Berechne den Multiplikator
+            multiplier = 10 ** (abs(int(np.log10(min_price))) + 1)
+            print(f"Normalizing prices with multiplier: {multiplier}")
+            
+            # Multipliziere alle Preisspalten
+            for col in price_cols:
+                df[col] = df[col] * multiplier
+            
+            # Speichere den Multiplikator in den Metadaten
+            df.attrs['price_multiplier'] = multiplier
+        else:
+            df.attrs['price_multiplier'] = 1
 
         # Save to cache
         self._save_to_cache(df, cache_file)
@@ -108,4 +147,9 @@ class OHLCFetcher:
     def _save_to_cache(self, df, filename):
         """Saves the dataframe to cache"""
         print(f"Saving data to cache: {filename}")
+        # Speichere den Multiplikator als separate Datei
+        multiplier_file = filename.replace('.csv', '_multiplier.txt')
+        with open(multiplier_file, 'w') as f:
+            f.write(str(df.attrs.get('price_multiplier', 1)))
+        
         df.to_csv(filename) 

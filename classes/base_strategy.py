@@ -1,10 +1,15 @@
 from abc import ABC, abstractmethod
+from classes.trade_analyzer import TradeAnalyzer
 
 class BaseStrategy(ABC):
     def __init__(self, initial_equity=10000, fee_pct=0.04):
         self.initial_equity = initial_equity
         self.fee_pct = fee_pct
-    
+        self.strategy_params = {
+            'initial_equity': initial_equity,
+            'fee_pct': fee_pct
+        }
+
     @staticmethod
     @abstractmethod
     def get_parameters():
@@ -16,7 +21,7 @@ class BaseStrategy(ABC):
         """Bereitet die Handelssignale vor"""
         pass
     
-    @abstractmethod
     def process_chunk(self, data):
-        """Verarbeitet die Daten und gibt die Trades zurück"""
-        pass 
+        """Process data chunk and return trades using the base implementation"""
+        df = self.prepare_signals(data)
+        return TradeAnalyzer.process_chunk_base(df, self.trade_direction, self.initial_equity, self.fee_pct) 

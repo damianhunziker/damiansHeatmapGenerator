@@ -1,0 +1,1 @@
+"""Heatmap module for strategy parameter optimization.""" 

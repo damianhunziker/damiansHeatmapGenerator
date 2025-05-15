@@ -3,25 +3,54 @@ import pandas as pd
 import numpy as np
 
 class TradeAnalyzer:
-    def __init__(self, strategy_class, strategy_params):
-        self.strategy = strategy_class(**strategy_params)
+    def __init__(self, strategy, strategy_params):
+        """Initialize the analyzer with a strategy instance"""
+        self.strategy = strategy  # Use the passed strategy instance directly
+        self.strategy_params = strategy_params
         self.initial_equity = strategy_params.get('initial_equity', 10000)
         self.fee_pct = strategy_params.get('fee_pct', 0.04)
+        self.price_multiplier = strategy_params.get('price_multiplier', 1.0)
+        print(f"TradeAnalyzer - Init - start_date: {strategy_params.get('start_date')}, end_date: {strategy_params.get('end_date')}")
     
-    def analyze_data(self, data, last_n_candles_analyze=None, last_n_candles_display=None, silent=False):
+    def analyze_data(self, data, last_n_candles=None, silent=False, start_date=None, end_date=None):
         """Analyzes the data and returns trades and statistics"""
         if not silent:
             print("\nCalculating signals...")
             pbar = tqdm(total=100, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}')
+
+        # Get dates from strategy_params if not provided
+        if start_date is None:
+            start_date = self.strategy_params.get('start_date')
+        if end_date is None:
+            end_date = self.strategy_params.get('end_date')
+            
+        print(f"TradeAnalyzer - analyze_data - start_date: {start_date}, end_date: {end_date}")
         
-        # Initialize strategy and calculate signals for the entire analysis period
+        # Filtere die Daten nach Datum, falls angegeben
+        if start_date and end_date:
+            data = data[start_date:end_date].copy()
+        elif start_date:
+            data = data[start_date:].copy()
+        elif end_date:
+            data = data[:end_date].copy()
+        else:
+            data = data.copy()
+            
+        # Normalisiere Preise falls nötig
+        if self.price_multiplier > 1:
+            price_columns = ['price_open', 'price_high', 'price_low', 'price_close']
+            for col in price_columns:
+                if col in data.columns:
+                    data[col] = data[col] * self.price_multiplier
+        
+        # Initialize strategy and calculate signals
         analyze_data = self.strategy.prepare_signals(data)
         if not silent:
             pbar.update(50)
         
-        # Trim data for analysis
-        if last_n_candles_analyze and last_n_candles_analyze > 0:
-            analyze_data = analyze_data.tail(last_n_candles_analyze)
+        # Trim data for analysis if specified
+        if last_n_candles and last_n_candles > 0:
+            analyze_data = analyze_data.tail(last_n_candles)
         if not silent:
             pbar.update(50)
             pbar.close()
@@ -29,15 +58,10 @@ class TradeAnalyzer:
         # Generate trades
         trades = self._generate_trades(analyze_data)
         
-        # Prepare data for display
-        display_data = analyze_data.copy()
-        if last_n_candles_display and last_n_candles_display > 0:
-            display_data = display_data.tail(last_n_candles_display)
-        
         if not silent:
             self._print_trade_statistics(trades)
         
-        return trades, display_data
+        return trades, analyze_data
     
     def _generate_trades(self, data):
         """Generates the trade list"""
@@ -62,6 +86,7 @@ class TradeAnalyzer:
                 elif in_position and data['short_exit'].iloc[i]:
                     exit_time = current_time
                     exit_price = float(current_price)
+                    exit_reason = data['exit_reason'].iloc[i]
                     
                     contracts = position_size / entry_price
                     price_change = entry_price - exit_price
@@ -80,7 +105,8 @@ class TradeAnalyzer:
                         net_profit,
                         gross_profit,
                         entry_fee + exit_fee,
-                        trade_type
+                        trade_type,
+                        exit_reason
                     ))
                     
                     current_equity += net_profit
@@ -97,6 +123,7 @@ class TradeAnalyzer:
                 elif in_position and data['long_exit'].iloc[i]:
                     exit_time = current_time
                     exit_price = float(current_price)
+                    exit_reason = data['exit_reason'].iloc[i]
                     
                     contracts = position_size / entry_price
                     price_change = exit_price - entry_price
@@ -115,7 +142,8 @@ class TradeAnalyzer:
                         net_profit,
                         gross_profit,
                         entry_fee + exit_fee,
-                        trade_type
+                        trade_type,
+                        exit_reason
                     ))
                     
                     current_equity += net_profit
@@ -129,38 +157,47 @@ class TradeAnalyzer:
             print("\nNo trades found!")
             return
         
-        print(f"\nClosed trades in analysis period: {len(trades)}")
-        print("\nDetailed trade list:")
-        print("=" * 120)
-        print(f"{'No':>3} | {'Type':<6} | {'Entry Time':^19} | {'Exit Time':^19} | {'Entry Price':>10} | {'Exit Price':>10} | {'Gross $':>10} | {'Fees':>8} | {'Net $':>10} | {'Profit %':>8}")
-        print("-" * 120)
+        # Print header
+        print("\nTrade List:")
+        print("=" * 140)
+        print(f"{'#':3} | {'Type':<6} | {'Entry Time':<16} | {'Exit Time':<16} | {'Entry':<10} | {'Exit':<10} | "
+              f"{'Gross P/L':<10} | {'Fees':<8} | {'Net P/L':<10} | {'%':<8} | {'Exit Reason':<25}")
+        print("=" * 140)
         
         current_equity = self.initial_equity
         for i, trade in enumerate(trades, 1):
-            entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, fees, trade_type = trade
-            profit_pct = (net_profit / current_equity) * 100
+            # Handle both old and new trade tuple formats
+            if len(trade) >= 9:  # New format with exit_reason
+                entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, fees, trade_type, exit_reason = trade
+            else:  # Old format without exit_reason
+                entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, fees, trade_type = trade
+                exit_reason = "N/A"
+            
+            profit_pct = (net_profit / current_equity) * 100 if net_profit is not None else 0
             
             print(f"{i:3d} | {trade_type:<6} | {entry_time.strftime('%Y-%m-%d %H:%M')} | "
                   f"{exit_time.strftime('%Y-%m-%d %H:%M')} | "
                   f"${entry_price:10.2f} | ${exit_price:10.2f} | "
-                  f"${gross_profit:10.2f} | ${fees:8.2f} | ${net_profit:10.2f} | {profit_pct:8.2f}%")
+                  f"${gross_profit:10.2f} | ${fees:8.2f} | ${net_profit:10.2f} | {profit_pct:8.2f}% | {exit_reason:<25}")
             
-            current_equity += net_profit
+            if net_profit is not None:
+                current_equity += net_profit
         
-        print("=" * 120)
+        print("=" * 140)
         
         # Calculate overall statistics
-        total_profit = sum(trade[4] for trade in trades)  # net_profit
-        total_gross = sum(trade[5] for trade in trades)   # gross_profit
-        total_fees = sum(trade[6] for trade in trades)    # fees
-        winning_trades = sum(1 for trade in trades if trade[4] > 0)
-        win_rate = (winning_trades / len(trades)) * 100
+        total_profit = sum(trade[4] for trade in trades if trade[4] is not None)  # net_profit
+        total_gross = sum(trade[5] for trade in trades if trade[5] is not None)   # gross_profit
+        total_fees = sum(trade[6] for trade in trades if trade[6] is not None)    # fees
+        winning_trades = sum(1 for trade in trades if trade[4] is not None and trade[4] > 0)
+        completed_trades = sum(1 for trade in trades if trade[4] is not None)
+        win_rate = (winning_trades / completed_trades) * 100 if completed_trades > 0 else 0
         
         print(f"\nOverall Statistics:")
         print(f"Gross Profit: ${total_gross:.2f}")
         print(f"Total Fees: ${total_fees:.2f}")
         print(f"Net Profit: ${total_profit:.2f}")
-        print(f"Winning Trades: {winning_trades} of {len(trades)} ({win_rate:.2f}%)")
+        print(f"Winning Trades: {winning_trades} of {completed_trades} ({win_rate:.2f}%)")
 
     def calculate_metrics(self, equity_curve, trades):
         """Calculate various financial metrics from an equity curve and trades."""
@@ -209,18 +246,19 @@ class TradeAnalyzer:
 
         # Calculate trade-related metrics
         for trade in trades:
-            entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, fees, trade_type = trade
-            total_fees += fees
-            total_gross_profit += gross_profit
-            total_net_profit += net_profit
-            total_trade_duration += (exit_time - entry_time).total_seconds()
-            if net_profit > 0:
-                winning_trades += 1
-                total_profit += net_profit
-            else:
-                total_loss += abs(net_profit)
+            entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, fees, trade_type, exit_reason = trade
+            if net_profit is not None:  # Only consider completed trades
+                total_fees += fees
+                total_gross_profit += gross_profit
+                total_net_profit += net_profit
+                total_trade_duration += (exit_time - entry_time).total_seconds()
+                if net_profit > 0:
+                    winning_trades += 1
+                    total_profit += net_profit
+                else:
+                    total_loss += abs(net_profit)
 
-        num_trades = len(trades)
+        num_trades = sum(1 for trade in trades if trade[4] is not None)  # Count only completed trades
         avg_trade_profit = total_net_profit / num_trades if num_trades > 0 else 0
         avg_trade_profit_pct = (avg_trade_profit / equity_curve[0]) * 100 if equity_curve[0] != 0 else 0
         avg_trade_duration = total_trade_duration / num_trades if num_trades > 0 else 0
@@ -244,4 +282,63 @@ class TradeAnalyzer:
             'profit_pct': profit_pct,
             'win_rate': win_rate,
             'profit_factor': profit_factor
-        } 
+        }
+
+    @staticmethod
+    def process_chunk_base(data, trade_direction, initial_equity, fee_pct):
+        """Base implementation of process_chunk that all strategies can use"""
+        trades = []
+        in_position = False
+        entry_time = None
+        entry_price = None
+        current_equity = initial_equity
+        current_direction = None
+        
+        for i in range(1, len(data)):
+            current_time = data.index[i]
+            
+            if not in_position:
+                if (trade_direction in ['long', 'both'] and data['long_entry'].iloc[i]) or \
+                   (trade_direction in ['short', 'both'] and data['short_entry'].iloc[i]):
+                    entry_time = current_time
+                    entry_price = data['price_close'].iloc[i]
+                    in_position = True
+                    current_direction = 'long' if data['long_entry'].iloc[i] else 'short'
+                    
+            elif (current_direction == 'long' and data['long_exit'].iloc[i]) or \
+                 (current_direction == 'short' and data['short_exit'].iloc[i]):
+                exit_price = data['price_close'].iloc[i]
+                
+                # Calculate position size and contracts
+                position_size = current_equity
+                contracts = position_size / entry_price
+                
+                # Calculate profit based on trade direction
+                if current_direction == "long":
+                    gross_profit = contracts * (exit_price - entry_price)
+                else:  # short
+                    gross_profit = contracts * (entry_price - exit_price)
+                
+                # Calculate fees and net profit
+                entry_fee = position_size * fee_pct
+                exit_fee = (position_size + gross_profit) * fee_pct
+                total_fee = entry_fee + exit_fee
+                net_profit = gross_profit - total_fee
+                
+                # Update equity
+                current_equity += net_profit
+                
+                # Add trade to list
+                trade = (entry_time, current_time, entry_price, exit_price, net_profit, gross_profit, total_fee, current_direction)
+                trades.append(trade)
+                
+                in_position = False
+                entry_time = None
+                entry_price = None
+        
+        # If the last position is still open
+        if in_position:
+            trade = (entry_time, data.index[-1], entry_price, data['price_close'].iloc[-1], None, None, None, current_direction)
+            trades.append(trade)
+        
+        return trades 

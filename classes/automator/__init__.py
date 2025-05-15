@@ -1,0 +1,1 @@
+"""Automator module for running strategies across multiple pairs.""" 

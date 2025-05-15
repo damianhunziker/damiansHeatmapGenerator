@@ -8,3 +8,7 @@ images/
 pnl_cache/
 classes/strategies/*
 !classes/strategies/macd_strategy.py
+classes/indicators/*
+/live_strategies/
+/test/
+

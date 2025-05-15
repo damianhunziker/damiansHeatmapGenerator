@@ -1,0 +1,31 @@
+Heatmap Automation Run - 20250126_014711
+==================================================
+
+Configuration:
+Interval: 4h
+Initial Equity: 1000
+Fee Percentage: 0.04
+Date Range: 2023-01-01 to 2024-01-01
+Strategy: 1
+
+Processing pairs:
+
+Error processing BTCUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing ETHUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing BNBUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing XRPUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing ADAUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing DOGEUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing MATICUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing SOLUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing DOTUSDT: [Errno 13] Permission denied: 'python'
+
+Error processing LINKUSDT: [Errno 13] Permission denied: 'python'

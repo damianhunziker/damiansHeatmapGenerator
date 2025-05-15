@@ -117,3 +117,86 @@ This project was developed with extensive use of AI, which provided valuable ins
 ## License
 
 This project is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License - see the [LICENSE](LICENSE) file for details.
+
+# Test Script for Trading Strategy Tools
+
+This script provides a unified interface to run various trading strategy tools with proper parameter validation and schema information.
+
+## Available Tools
+
+1. **automator.py** - Automates running strategies across multiple pairs
+2. **heatmap.py** - Generates heatmaps for strategy parameter optimization
+3. **chart_analysis.py** - Analyzes and visualizes trading charts
+4. **pnl.py** - Calculates and visualizes PnL
+5. **fetcher.py** - Fetches market data
+
+## Usage
+
+### View Parameter Schema
+
+To see the required parameters and their formats for all tools:
+
+```bash
+python test.py --schema
+```
+
+### Run a Tool
+
+General format:
+```bash
+python test.py <tool_name> [parameters]
+```
+
+Example:
+```bash
+python test.py pnl --start_date="2024-01-01" --end_date="2024-03-01" --asset="BTCUSDT" --interval="4h"
+```
+
+### Common Parameters
+
+All tools accept these common parameters:
+
+- `start_date` (Required) - Analysis start date in YYYY-MM-DD format
+- `end_date` (Required) - Analysis end date in YYYY-MM-DD format
+- `interval` (Optional) - Trading interval (default: 4h)
+  - Valid values: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d
+- `asset` (Required) - Trading pair (e.g., BTCUSDT)
+
+### Tool-Specific Parameters
+
+Each tool may have additional required or optional parameters. Use the `--schema` option to see the complete parameter list for each tool.
+
+## Error Handling
+
+The script will:
+1. Validate all required parameters are provided
+2. Check date formats are correct
+3. Verify interval values are valid
+4. Display helpful error messages if validation fails
+
+## Examples
+
+1. Run heatmap analysis:
+```bash
+python test.py heatmap --start_date="2024-01-01" --end_date="2024-03-01" --asset="BTCUSDT" --interval="4h"
+```
+
+2. Run PnL analysis:
+```bash
+python test.py pnl --start_date="2024-01-01" --end_date="2024-03-01" --asset="ETHUSDT" --interval="1h"
+```
+
+3. Run chart analysis:
+```bash
+python test.py chart_analysis --start_date="2024-01-01" --end_date="2024-03-01" --asset="BTCUSDT"
+```
+
+4. Fetch market data:
+```bash
+python test.py fetcher --start_date="2024-01-01" --end_date="2024-03-01" --asset="BTCUSDT" --interval="1d"
+```
+
+5. Run automated analysis:
+```bash
+python test.py automator --start_date="2024-01-01" --end_date="2024-03-01" --asset="BTCUSDT" --interval="4h"
+```

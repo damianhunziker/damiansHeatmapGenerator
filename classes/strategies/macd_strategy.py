@@ -23,6 +23,12 @@ class SMACrossoverStrategy(BaseStrategy):
             'fast_length': (20, "Fast SMA Length"),
             'slow_length': (50, "Slow SMA Length"),
         }
+
+    @staticmethod
+    def get_required_timeframes():
+        return {
+            'primary': '4h',    # Main trading timeframe
+        }
     
     def calculate_sma(self, data, length):
         """Calculate Simple Moving Average"""

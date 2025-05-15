@@ -1,0 +1,51 @@
+Heatmap Automation Run - 20250126_230106
+==================================================
+
+Configuration:
+Interval: 4h
+Initial Equity: 1000
+Fee Percentage: 0.04
+Date Range: 2020-09-17 to 2025-01-25
+Strategy: KAMAStrategy
+
+Processing pairs:
+
+BTCUSDT - 2025-01-26 23:01:06
+
+Error processing BTCUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+ETHUSDT - 2025-01-26 23:01:06
+
+Error processing ETHUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+BNBUSDT - 2025-01-26 23:01:06
+
+Error processing BNBUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+SOLUSDT - 2025-01-26 23:01:06
+
+Error processing SOLUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+DOGEUSDT - 2025-01-26 23:01:06
+
+Error processing DOGEUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+AVAXUSDT - 2025-01-26 23:01:06
+
+Error processing AVAXUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+LINKUSDT - 2025-01-26 23:01:06
+
+Error processing LINKUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+SHIBUSDT - 2025-01-26 23:01:06
+
+Error processing SHIBUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+APEUSDT - 2025-01-26 23:01:06
+
+Error processing APEUSDT: create_heatmap() got an unexpected keyword argument 'data'
+
+TONUSDT - 2025-01-26 23:01:06
+
+Error processing TONUSDT: create_heatmap() got an unexpected keyword argument 'data'

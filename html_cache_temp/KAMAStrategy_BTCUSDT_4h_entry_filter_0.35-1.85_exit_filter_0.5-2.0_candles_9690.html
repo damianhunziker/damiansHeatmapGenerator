@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5.20.1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+</head>
+<body>
+<div class="vega-visualization" id="vega-visualization-0924a39807014f78991f746cc5c924ea"></div>
+<script type="text/javascript">
+  const spec = {"config": {"view": {"continuousWidth": 300, "continuousHeight": 300}}, "hconcat": [{"mark": {"type": "rect"}, "encoding": {"color": {"field": "profit", "scale": {"domain": [115.24710786301368, 237.74659314828517], "scheme": "viridis"}, "title": "Profit %", "type": "quantitative"}, "tooltip": [{"field": "profit", "format": ".2f", "title": "**Profit %**", "type": "quantitative"}, {"field": "sharpe_ratio", "format": ".2f", "title": "**Sharpe Ratio**", "type": "quantitative"}, {"field": "drawdown_pct", "format": ".2f", "title": "**Max Drawdown %**", "type": "quantitative"}, {"field": "x", "title": "entry_filter", "type": "ordinal"}, {"field": "y", "title": "exit_filter", "type": "ordinal"}, {"field": "net_profit", "format": ",.2f", "title": "Net Profit $", "type": "quantitative"}, {"field": "num_trades", "title": "Number of Trades", "type": "quantitative"}, {"field": "win_rate", "format": ".2%", "title": "Win Rate", "type": "quantitative"}, {"field": "profit_factor", "format": ".2f", "title": "Profit Factor", "type": "quantitative"}, {"field": "drawdown", "format": ",.2f", "title": "Max Drawdown $", "type": "quantitative"}, {"field": "avg_trade_profit", "format": ",.2f", "title": "Avg Trade Profit $", "type": "quantitative"}, {"field": "avg_trade_profit_pct", "format": ".2f", "title": "Avg Trade Profit %", "type": "quantitative"}, {"field": "avg_trade_duration", "title": "Avg Trade Duration", "type": "quantitative"}, {"field": "volatility", "format": ".2f", "title": "Volatility", "type": "quantitative"}, {"field": "sortino_ratio", "title": "Sortino Ratio", "type": "quantitative"}, {"field": "pnl_image", "title": "PnL Image", "type": "nominal"}], "x": {"axis": {"format": ".3f"}, "field": "x", "title": "entry_filter", "type": "ordinal"}, "y": {"axis": {"format": ".3f"}, "field": "y", "title": "exit_filter", "type": "ordinal"}}, "height": 400, "title": "Strategy Results Heatmap: KAMAStrategy - Profit", "width": 300}, {"mark": {"type": "rect"}, "encoding": {"color": {"field": "sharpe_ratio", "scale": {"domain": [0.15774357916802803, 0.2508831071179451], "scheme": "plasma"}, "title": "Sharpe Ratio", "type": "quantitative"}, "tooltip": [{"field": "profit", "format": ".2f", "title": "**Profit %**", "type": "quantitative"}, {"field": "sharpe_ratio", "format": ".2f", "title": "**Sharpe Ratio**", "type": "quantitative"}, {"field": "drawdown_pct", "format": ".2f", "title": "**Max Drawdown %**", "type": "quantitative"}, {"field": "x", "title": "entry_filter", "type": "ordinal"}, {"field": "y", "title": "exit_filter", "type": "ordinal"}, {"field": "net_profit", "format": ",.2f", "title": "Net Profit $", "type": "quantitative"}, {"field": "num_trades", "title": "Number of Trades", "type": "quantitative"}, {"field": "win_rate", "format": ".2%", "title": "Win Rate", "type": "quantitative"}, {"field": "profit_factor", "format": ".2f", "title": "Profit Factor", "type": "quantitative"}, {"field": "drawdown", "format": ",.2f", "title": "Max Drawdown $", "type": "quantitative"}, {"field": "avg_trade_profit", "format": ",.2f", "title": "Avg Trade Profit $", "type": "quantitative"}, {"field": "avg_trade_profit_pct", "format": ".2f", "title": "Avg Trade Profit %", "type": "quantitative"}, {"field": "avg_trade_duration", "title": "Avg Trade Duration", "type": "quantitative"}, {"field": "volatility", "format": ".2f", "title": "Volatility", "type": "quantitative"}, {"field": "sortino_ratio", "title": "Sortino Ratio", "type": "quantitative"}, {"field": "pnl_image", "title": "PnL Image", "type": "nominal"}], "x": {"axis": {"format": ".3f"}, "field": "x", "title": "entry_filter", "type": "ordinal"}, "y": {"axis": {"format": ".3f"}, "field": "y", "title": "exit_filter", "type": "ordinal"}}, "height": 400, "title": "Strategy Results Heatmap: KAMAStrategy - Sharpe Ratio", "width": 300}, {"mark": {"type": "rect"}, "encoding": {"color": {"field": "drawdown_pct", "scale": {"domain": [26.331790969453166, 38.042113474156174], "reverse": true, "scheme": "inferno"}, "title": "Max Drawdown %", "type": "quantitative"}, "tooltip": [{"field": "profit", "format": ".2f", "title": "**Profit %**", "type": "quantitative"}, {"field": "sharpe_ratio", "format": ".2f", "title": "**Sharpe Ratio**", "type": "quantitative"}, {"field": "drawdown_pct", "format": ".2f", "title": "**Max Drawdown %**", "type": "quantitative"}, {"field": "x", "title": "entry_filter", "type": "ordinal"}, {"field": "y", "title": "exit_filter", "type": "ordinal"}, {"field": "net_profit", "format": ",.2f", "title": "Net Profit $", "type": "quantitative"}, {"field": "num_trades", "title": "Number of Trades", "type": "quantitative"}, {"field": "win_rate", "format": ".2%", "title": "Win Rate", "type": "quantitative"}, {"field": "profit_factor", "format": ".2f", "title": "Profit Factor", "type": "quantitative"}, {"field": "drawdown", "format": ",.2f", "title": "Max Drawdown $", "type": "quantitative"}, {"field": "avg_trade_profit", "format": ",.2f", "title": "Avg Trade Profit $", "type": "quantitative"}, {"field": "avg_trade_profit_pct", "format": ".2f", "title": "Avg Trade Profit %", "type": "quantitative"}, {"field": "avg_trade_duration", "title": "Avg Trade Duration", "type": "quantitative"}, {"field": "volatility", "format": ".2f", "title": "Volatility", "type": "quantitative"}, {"field": "sortino_ratio", "title": "Sortino Ratio", "type": "quantitative"}, {"field": "pnl_image", "title": "PnL Image", "type": "nominal"}], "x": {"axis": {"format": ".3f"}, "field": "x", "title": "entry_filter", "type": "ordinal"}, "y": {"axis": {"format": ".3f"}, "field": "y", "title": "exit_filter", "type": "ordinal"}}, "height": 400, "title": "Strategy Results Heatmap: KAMAStrategy - Max Drawdown", "width": 300}], "data": {"name": "data-9f7eecb54d9834890c0f69aef15886a8"}, "resolve": {"scale": {"color": "independent"}}, "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json", "datasets": {"data-9f7eecb54d9834890c0f69aef15886a8": [{"x": 0.35, "y": 0.5, "profit": 237.74659314828517, "net_profit": 2377.465931482852, "num_trades": 70, "win_rate": 32.857142857142854, "profit_factor": 1.5540612771119697, "drawdown": 0.38042113474156175, "drawdown_pct": 38.042113474156174, "avg_trade_profit": 33.9637990211836, "avg_trade_profit_pct": 3.39637990211836, "avg_trade_duration": 341897.14285714284, "sharpe_ratio": 0.18887922268572094, "sortino_ratio": 1.058536267297723, "volatility": 0.12523494263672252, "pnl_image": "pnl-img-0"}, {"x": 0.35, "y": 1.0, "profit": 179.05902389575027, "net_profit": 1790.5902389575026, "num_trades": 58, "win_rate": 34.48275862068966, "profit_factor": 1.431464821680932, "drawdown": 0.3755196213217227, "drawdown_pct": 37.551962132172264, "avg_trade_profit": 30.872245499267287, "avg_trade_profit_pct": 3.0872245499267286, "avg_trade_duration": 438206.8965517241, "sharpe_ratio": 0.18858444431033164, "sortino_ratio": 0.9855020651662915, "volatility": 0.13109960315018393, "pnl_image": "pnl-img-1"}, {"x": 0.35, "y": 1.5, "profit": 183.99478475426977, "net_profit": 1839.947847542698, "num_trades": 47, "win_rate": 36.17021276595745, "profit_factor": 1.5019109827973134, "drawdown": 0.26331790969453167, "drawdown_pct": 26.331790969453166, "avg_trade_profit": 39.147826543461655, "avg_trade_profit_pct": 3.9147826543461655, "avg_trade_duration": 555472.340425532, "sharpe_ratio": 0.18772304349864669, "sortino_ratio": 1.2349575863232938, "volatility": 0.17956810503927836, "pnl_image": "pnl-img-2"}, {"x": 0.35, "y": 2.0, "profit": 118.67109892667614, "net_profit": 1186.7109892667613, "num_trades": 45, "win_rate": 31.11111111111111, "profit_factor": 1.2979337738673324, "drawdown": 0.34059545311004086, "drawdown_pct": 34.059545311004086, "avg_trade_profit": 26.37135531703914, "avg_trade_profit_pct": 2.637135531703914, "avg_trade_duration": 592960.0, "sharpe_ratio": 0.15774357916802803, "sortino_ratio": 1.0075830014195408, "volatility": 0.1985694348529758, "pnl_image": "pnl-img-3"}, {"x": 0.85, "y": 0.5, "profit": 171.0812680018226, "net_profit": 1710.812680018226, "num_trades": 57, "win_rate": 33.33333333333333, "profit_factor": 1.5195051516708329, "drawdown": 0.3713155370476489, "drawdown_pct": 37.13155370476489, "avg_trade_profit": 30.014257544179404, "avg_trade_profit_pct": 3.0014257544179404, "avg_trade_duration": 366821.05263157893, "sharpe_ratio": 0.18794494863836192, "sortino_ratio": 1.0898863261087943, "volatility": 0.12824454079091838, "pnl_image": "pnl-img-4"}, {"x": 0.85, "y": 1.0, "profit": 149.21943586255145, "net_profit": 1492.1943586255147, "num_trades": 49, "win_rate": 34.69387755102041, "profit_factor": 1.4453777700026582, "drawdown": 0.3561033260759865, "drawdown_pct": 35.61033260759865, "avg_trade_profit": 30.45294609439826, "avg_trade_profit_pct": 3.0452946094398263, "avg_trade_duration": 461681.63265306124, "sharpe_ratio": 0.19500744408631576, "sortino_ratio": 1.1936128209148502, "volatility": 0.13259982289600877, "pnl_image": "pnl-img-5"}, {"x": 0.85, "y": 1.5, "profit": 165.82476169605985, "net_profit": 1658.2476169605984, "num_trades": 42, "win_rate": 38.095238095238095, "profit_factor": 1.5777348859816032, "drawdown": 0.29726916146465737, "drawdown_pct": 29.726916146465737, "avg_trade_profit": 39.482086118109486, "avg_trade_profit_pct": 3.9482086118109487, "avg_trade_duration": 564342.8571428572, "sharpe_ratio": 0.19426556117164046, "sortino_ratio": 1.4507313628668914, "volatility": 0.17878998926197787, "pnl_image": "pnl-img-6"}, {"x": 0.85, "y": 2.0, "profit": 115.24710786301368, "net_profit": 1152.4710786301368, "num_trades": 40, "win_rate": 32.5, "profit_factor": 1.344446084403889, "drawdown": 0.37098531712835003, "drawdown_pct": 37.098531712835005, "avg_trade_profit": 28.81177696575342, "avg_trade_profit_pct": 2.881177696575342, "avg_trade_duration": 606600.0, "sharpe_ratio": 0.16682501940532765, "sortino_ratio": 1.1116431749628581, "volatility": 0.20171001638261762, "pnl_image": "pnl-img-7"}, {"x": 1.35, "y": 0.5, "profit": 210.18152473564547, "net_profit": 2101.8152473564546, "num_trades": 50, "win_rate": 38.0, "profit_factor": 1.7284266543822184, "drawdown": 0.32474226326881084, "drawdown_pct": 32.47422632688108, "avg_trade_profit": 42.03630494712909, "avg_trade_profit_pct": 4.203630494712908, "avg_trade_duration": 398592.0, "sharpe_ratio": 0.21994033781389474, "sortino_ratio": 1.3568470930514507, "volatility": 0.1376027536987705, "pnl_image": "pnl-img-8"}, {"x": 1.35, "y": 1.0, "profit": 196.51163698417128, "net_profit": 1965.1163698417129, "num_trades": 43, "win_rate": 39.53488372093023, "profit_factor": 1.672987071142407, "drawdown": 0.3066533860475605, "drawdown_pct": 30.665338604756048, "avg_trade_profit": 45.700380693993324, "avg_trade_profit_pct": 4.570038069399333, "avg_trade_duration": 506009.3023255814, "sharpe_ratio": 0.2367743896211582, "sortino_ratio": 1.5250555452477914, "volatility": 0.1418150215450483, "pnl_image": "pnl-img-9"}, {"x": 1.35, "y": 1.5, "profit": 187.94266993219716, "net_profit": 1879.4266993219717, "num_trades": 38, "win_rate": 39.473684210526315, "profit_factor": 1.72885731161356, "drawdown": 0.26930837062798196, "drawdown_pct": 26.930837062798197, "avg_trade_profit": 49.4585973505782, "avg_trade_profit_pct": 4.94585973505782, "avg_trade_duration": 602905.2631578947, "sharpe_ratio": 0.21615704889033163, "sortino_ratio": 1.5900158247864258, "volatility": 0.18698991443400312, "pnl_image": "pnl-img-10"}, {"x": 1.35, "y": 2.0, "profit": 167.31179796822371, "net_profit": 1673.117979682237, "num_trades": 36, "win_rate": 36.11111111111111, "profit_factor": 1.5810314709495623, "drawdown": 0.2956465646645458, "drawdown_pct": 29.56465646645458, "avg_trade_profit": 46.4754994356177, "avg_trade_profit_pct": 4.64754994356177, "avg_trade_duration": 646800.0, "sharpe_ratio": 0.20509763098501388, "sortino_ratio": 1.7277809402715332, "volatility": 0.2097828448063931, "pnl_image": "pnl-img-11"}, {"x": 1.85, "y": 0.5, "profit": 197.69636494518917, "net_profit": 1976.9636494518918, "num_trades": 46, "win_rate": 39.130434782608695, "profit_factor": 1.737850313979238, "drawdown": 0.3075176244028854, "drawdown_pct": 30.751762440288537, "avg_trade_profit": 42.97747064025852, "avg_trade_profit_pct": 4.2977470640258515, "avg_trade_duration": 415721.73913043475, "sharpe_ratio": 0.22655173117550306, "sortino_ratio": 1.3645267972720132, "volatility": 0.13961162938797625, "pnl_image": "pnl-img-12"}, {"x": 1.85, "y": 1.0, "profit": 199.2995283727824, "net_profit": 1992.995283727824, "num_trades": 39, "win_rate": 41.02564102564102, "profit_factor": 1.7150789199260086, "drawdown": 0.279220552319283, "drawdown_pct": 27.9220552319283, "avg_trade_profit": 51.10244317250831, "avg_trade_profit_pct": 5.110244317250831, "avg_trade_duration": 536861.5384615385, "sharpe_ratio": 0.2508831071179451, "sortino_ratio": 1.6000111131281238, "volatility": 0.14845547369809758, "pnl_image": "pnl-img-13"}, {"x": 1.85, "y": 1.5, "profit": 163.10338835268666, "net_profit": 1631.0338835268667, "num_trades": 36, "win_rate": 38.88888888888889, "profit_factor": 1.6237421314226725, "drawdown": 0.3067297725741252, "drawdown_pct": 30.67297725741252, "avg_trade_profit": 45.306496764635185, "avg_trade_profit_pct": 4.5306496764635185, "avg_trade_duration": 612000.0, "sharpe_ratio": 0.20857514066395894, "sortino_ratio": 1.4735822945144557, "volatility": 0.19308123699761667, "pnl_image": "pnl-img-14"}, {"x": 1.85, "y": 2.0, "profit": 153.94982763511902, "net_profit": 1539.4982763511903, "num_trades": 34, "win_rate": 35.294117647058826, "profit_factor": 1.5495419632186977, "drawdown": 0.33171909096197677, "drawdown_pct": 33.17190909619768, "avg_trade_profit": 45.27936106915266, "avg_trade_profit_pct": 4.527936106915266, "avg_trade_duration": 658588.2352941176, "sharpe_ratio": 0.20383960072818294, "sortino_ratio": 1.6471807844527961, "volatility": 0.21658330462320038, "pnl_image": "pnl-img-15"}]}};
+  const embedOpt = {};
+  vegaEmbed('#vega-visualization-0924a39807014f78991f746cc5c924ea', spec, embedOpt)
+    .then(function(result) {
+        const view = result.view;
+        view.addEventListener('mouseover', function(event, item) {
+            if (item && item.datum && item.datum.pnl_image) {
+                const imgId = item.datum.pnl_image;
+                const img = document.getElementById(imgId);
+                img.style.display = 'block';
+            }
+        });
+        view.addEventListener('mouseout', function(event, item) {
+            if (item && item.datum && item.datum.pnl_image) {
+                const imgId = item.datum.pnl_image;
+                const img = document.getElementById(imgId);
+                img.style.display = 'none';
+            }
+        });
+    }).catch(console.error);
+</script>
+
+    <style>
+        .vega-visualization canvas {
+            width: 100%;
+        }
+        #heatmap-container {
+            display: flex;
+            width: 100%;
+        }
+        #heatmap {
+            width: 50%;
+        }
+        #pnl-image-container {
+            width: 30%;
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+        #pnl-image-container img {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+        }
+    </style>
+    <div id="heatmap-container">
+        <div id="heatmap"></div>
+        <div id="pnl-image-container">
+            <img id="pnl-img-0" src="pnl_images/pnl_image_0.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-1" src="pnl_images/pnl_image_1.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-2" src="pnl_images/pnl_image_2.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-3" src="pnl_images/pnl_image_3.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-4" src="pnl_images/pnl_image_4.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-5" src="pnl_images/pnl_image_5.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-6" src="pnl_images/pnl_image_6.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-7" src="pnl_images/pnl_image_7.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-8" src="pnl_images/pnl_image_8.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-9" src="pnl_images/pnl_image_9.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-10" src="pnl_images/pnl_image_10.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-11" src="pnl_images/pnl_image_11.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-12" src="pnl_images/pnl_image_12.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-13" src="pnl_images/pnl_image_13.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-14" src="pnl_images/pnl_image_14.png" alt="PnL Image" style="display:none;" width="70%">
+<img id="pnl-img-15" src="pnl_images/pnl_image_15.png" alt="PnL Image" style="display:none;" width="70%">
+
+        </div>
+    </div>
+    
+    <div id="parameter-info" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9;">
+        <h3>Parameter Information</h3>
+        <p><strong>Strategy Name:</strong> KAMAStrategy</p>
+        <p><strong>Asset:</strong> BTCUSDT</p>
+        <p><strong>Initial Equity:</strong> 1000.0</p>
+        <p><strong>Fee Percentage:</strong> 0.04%</p>
+        <p><strong>Interval:</strong> 4h</p>
+        <p><strong>Investigation Period:</strong> 2020-08-18 to 2022-01-21</p>
+        <h4>Parameter Ranges:</h4>
+        <ul>
+            <li><strong>entry_filter:</strong> [0.35 0.85 1.35 1.85]</li><li><strong>exit_filter:</strong> [0.5 1.  1.5 2. ]</li>
+        </ul>
+        <h4>Fixed Parameters:</h4>
+        <ul>
+            <li><strong>_abc_impl:</strong> <_abc._abc_data object at 0x162110540></li><li><strong>entry_fast_length:</strong> 4</li><li><strong>entry_length:</strong> 16</li><li><strong>entry_slow_length:</strong> 24</li><li><strong>exit_fast_length:</strong> 2</li><li><strong>exit_length:</strong> 14</li><li><strong>exit_slow_length:</strong> 20</li><li><strong>trade_direction:</strong> long</li><li><strong>use_filters:</strong> True</li>
+        </ul>
+    </div>
+    
+    </body>
+</html>
