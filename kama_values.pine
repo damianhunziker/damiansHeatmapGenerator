@@ -1,0 +1,58 @@
+//@version=5
+indicator("KAMA Values to JSON", overlay=true)
+
+// Input parameters
+length = input.int(16, "Length")
+fastLength = input.int(4, "Fast Length")
+slowLength = input.int(24, "Slow Length")
+
+// KAMA calculation function
+getKAMA(src, length1, fastLength1, slowLength1) =>
+    mom = math.abs(ta.change(src, length1))
+    volatility = math.sum(math.abs(ta.change(src)), length1)
+    er = volatility != 0 ? mom / volatility : 0
+    fastAlpha = 2 / (fastLength1 + 1)
+    slowAlpha = 2 / (slowLength1 + 1)
+    sc = math.pow(er * (fastAlpha - slowAlpha) + slowAlpha, 2)
+    var float kama = na
+    kama := na(kama) ? src : sc * src + (1 - sc) * nz(kama[1])
+    kama
+
+// Calculate KAMA
+var kama = getKAMA(close, length, fastLength, slowLength)
+
+// Store values in arrays
+var values = array.new_float(0)
+var timestamps = array.new_int(0)
+
+// Variables to track real-time calculation
+var bool firstCalcDone = false
+var int firstCalcBar = na
+
+// Check if we're at the first calculation point
+if na(kama[1]) and not na(kama)
+    firstCalcBar := bar_index
+    firstCalcDone := true
+
+// Create alert condition
+alertcondition = firstCalcDone and bar_index >= firstCalcBar and barstate.isrealtime
+
+if alertcondition
+    // Only collect latest 20 values
+    for i = 0 to 19
+        array.unshift(values, kama[i])
+        array.unshift(timestamps, time[i])
+    
+    // Create compact JSON string
+    var string json = "{\"data\":["
+    for i = 0 to array.size(values) - 1
+        json := json + "[" + str.tostring(array.get(timestamps, i)) + "," + str.tostring(array.get(values, i)) + "]"
+        if i < array.size(values) - 1
+            json := json + ","
+    json := json + "]}"
+    
+    // Create alert message
+    alert(json, alert.freq_once_per_bar)
+
+// Plot KAMA for visualization
+plot(kama, "KAMA", color=color.blue) 

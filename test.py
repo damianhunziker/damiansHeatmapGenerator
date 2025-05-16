@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import os
 from strategy_utils import get_available_strategies
+import pandas as pd
 
 def get_class_init_params(module_name: str, class_name: str) -> Dict[str, Any]:
     """Get initialization parameters for a class from a module."""
@@ -151,63 +152,63 @@ def validate_date(date_str: str) -> bool:
 
 def validate_parameters(exec_name: str, params: Dict[str, Any]) -> List[str]:
     """Validate parameters for an executable."""
-    schema = get_schema()
-    if exec_name not in schema:
-        return [f"Unknown executable: {exec_name}"]
-    
     errors = []
-    exec_params = schema[exec_name]['parameters']
     
-    # Check required parameters
-    for param_name, param_info in exec_params.items():
-        if param_info.get('required', False):
-            if param_name not in params:
-                errors.append(f"Missing required parameter: {param_name}")
-                continue
-            
-            # Validate dates
-            if param_name in ['start_date', 'end_date']:
-                if not validate_date(params[param_name]):
-                    errors.append(f"Invalid date format for {param_name}. Use YYYY-MM-DD")
-                elif param_name == 'start_date' and 'end_date' in params:
-                    start = datetime.strptime(params['start_date'], '%Y-%m-%d')
-                    end = datetime.strptime(params['end_date'], '%Y-%m-%d')
-                    if start > end:
-                        errors.append("start_date must be before or equal to end_date")
+    # Validate required parameters
+    if 'start_date' not in params:
+        errors.append("Missing required parameter: start_date")
+    elif not validate_date(params['start_date']):
+        errors.append("Invalid date format for start_date. Use YYYY-MM-DD")
     
-    # Check interval
-    if 'interval' in params:
-        valid_intervals = exec_params['interval']['enum']
-        if params['interval'] not in valid_intervals:
-            errors.append(f"Invalid interval. Must be one of: {', '.join(valid_intervals)}")
+    if 'end_date' not in params:
+        errors.append("Missing required parameter: end_date")
+    elif not validate_date(params['end_date']):
+        errors.append("Invalid date format for end_date. Use YYYY-MM-DD")
+    
+    if 'start_date' in params and 'end_date' in params:
+        start = datetime.strptime(params['start_date'], '%Y-%m-%d')
+        end = datetime.strptime(params['end_date'], '%Y-%m-%d')
+        if start > end:
+            errors.append("start_date must be before or equal to end_date")
+    
+    if 'asset' not in params:
+        errors.append("Missing required parameter: asset")
+    
+    # Validate interval
+    valid_intervals = ['1m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '8h', '12h', '1d']
+    if 'interval' in params and params['interval'] not in valid_intervals:
+        errors.append(f"Invalid interval. Must be one of: {', '.join(valid_intervals)}")
     
     # Check strategy-specific parameters if a strategy is specified
     if 'strategy' in params:
-        strategy_name = params['strategy']
-        if strategy_name in schema['strategies']:
-            strategy_params = schema['strategies'][strategy_name]['parameters']
-            for param_name, param_info in strategy_params.items():
-                if param_info.get('required', False) and param_name not in params:
-                    errors.append(f"Missing required strategy parameter: {param_name}")
-                elif param_name in params:
-                    # Type validation for strategy parameters
-                    try:
-                        param_type = eval(param_info.get('annotation', 'str'))
-                        if not isinstance(params[param_name], param_type):
-                            # Try to convert the value to the correct type
-                            params[param_name] = param_type(params[param_name])
-                    except (ValueError, TypeError):
-                        errors.append(f"Invalid type for parameter {param_name}. Expected {param_info.get('annotation', 'str')}")
-                    except NameError:
-                        # If type annotation is not a built-in type, skip validation
-                        pass
-        else:
-            errors.append(f"Unknown strategy: {strategy_name}")
+        try:
+            strategies = get_available_strategies()
+            strategy_found = False
+            for _, (name, strategy_class) in strategies.items():
+                if name == params['strategy']:
+                    strategy_found = True
+                    # Get strategy parameters
+                    strategy_params = strategy_class.get_parameters()
+                    for param_name, (default_value, description) in strategy_params.items():
+                        if param_name not in params:
+                            if default_value is None:
+                                errors.append(f"Missing required strategy parameter: {param_name} - {description}")
+                        else:
+                            try:
+                                # Try to convert the value to the correct type
+                                params[param_name] = type(default_value)(params[param_name])
+                            except (ValueError, TypeError):
+                                errors.append(f"Invalid type for parameter {param_name}. Expected {type(default_value).__name__}")
+                    break
+            if not strategy_found:
+                errors.append(f"Unknown strategy: {params['strategy']}")
+        except Exception as e:
+            errors.append(f"Error validating strategy parameters: {str(e)}")
     
     return errors
 
 def run_executable(exec_name: str, params: Dict[str, Any]) -> None:
-    """Run an executable with the given parameters."""
+    """Run an executable with parameters."""
     # Validate parameters
     errors = validate_parameters(exec_name, params)
     if errors:
@@ -216,59 +217,81 @@ def run_executable(exec_name: str, params: Dict[str, Any]) -> None:
             print(f"- {error}")
         return
     
-    try:
-        # Import the module
-        try:
-            if not exec_name.startswith('classes.'):
-                module = importlib.import_module(f'classes.{exec_name}')
-            else:
-                module = importlib.import_module(exec_name)
-        except ImportError:
-            # Try importing directly if classes import fails
-            try:
-                module = importlib.import_module(exec_name)
-            except ImportError as e:
-                print(f"Error: Could not import module {exec_name}: {str(e)}")
-                return
-        
-        # Get the main class
-        class_name = None
-        if exec_name == 'automator':
-            class_name = 'Automator'
-        elif exec_name == 'heatmap':
-            class_name = 'Heatmap'
-        elif exec_name == 'chart_analysis':
-            class_name = 'ChartAnalysis'
-        elif exec_name == 'pnl':
-            class_name = 'PnL'
-        elif exec_name == 'fetcher':
-            class_name = 'OHLCFetcher'
-        
-        if class_name is None:
-            print(f"Error: Unknown executable {exec_name}")
-            return
-        
-        try:
-            class_obj = getattr(module, class_name)
-        except AttributeError:
-            print(f"Error: Class {class_name} not found in module {exec_name}")
-            return
-        
-        # Create instance and run
-        try:
-            instance = class_obj(**params)
-            if hasattr(instance, 'run'):
-                instance.run()
-            else:
-                print(f"Error: {class_name} does not have a run() method")
-        except Exception as e:
-            print(f"Error running {exec_name}: {str(e)}")
-            import traceback
-            traceback.print_exc()
-    except Exception as e:
-        print(f"Unexpected error running {exec_name}: {str(e)}")
-        import traceback
-        traceback.print_exc()
+    # Fetch data if needed
+    cache_dir = "ohlc_cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = f"{cache_dir}/{params['asset']}_{params['interval']}_ohlc.csv"
+    
+    if not os.path.exists(cache_file):
+        print(f"\nFetching data for {params['asset']} at {params['interval']} interval...")
+        fetch_data(params['asset'], params['interval'])
+    
+    # Load data
+    data = pd.read_csv(cache_file, index_col='time_period_start', parse_dates=True)
+    
+    # Filter data by date range
+    data = data[params['start_date']:params['end_date']]
+    
+    # Create timeframe data structure
+    timeframe_data = {
+        'primary': {
+            'interval': params['interval'],
+            'data': data
+        }
+    }
+    
+    # Run the appropriate executable
+    if exec_name == 'pnl':
+        from pnl import create_interactive_chart
+        strategies = get_available_strategies()
+        strategy_found = False
+        for _, (name, strategy_class) in strategies.items():
+            if name == params['strategy']:
+                strategy_found = True
+                create_interactive_chart(timeframe_data, strategy_class, params)
+                break
+        if not strategy_found:
+            print(f"Error: Strategy {params['strategy']} not found")
+    
+    elif exec_name == 'heatmap':
+        from heatmap import create_heatmap
+        strategies = get_available_strategies()
+        strategy_found = False
+        for _, (name, strategy_class) in strategies.items():
+            if name == params['strategy']:
+                strategy_found = True
+                param_ranges = strategy_class.get_parameter_ranges()
+                create_heatmap(
+                    timeframe_data=timeframe_data,
+                    strategy_class=strategy_class,
+                    param_ranges=param_ranges,
+                    initial_equity=params.get('initial_equity', 10000),
+                    fee_pct=params.get('fee_pct', 0.04),
+                    last_n_candles_analyze=None,
+                    last_n_candles_display=None,
+                    interval=params['interval'],
+                    asset=params['asset'],
+                    strategy_name=params['strategy'],
+                    start_date=params['start_date'],
+                    end_date=params['end_date']
+                )
+                break
+        if not strategy_found:
+            print(f"Error: Strategy {params['strategy']} not found")
+    
+    elif exec_name == 'chart_analysis':
+        from chart_analysis import create_chart
+        create_chart(timeframe_data, params)
+    
+    elif exec_name == 'fetcher':
+        print(f"Data fetched and saved to {cache_file}")
+    
+    elif exec_name == 'automator':
+        from automator import run_heatmap_for_pairs
+        run_heatmap_for_pairs()
+    
+    else:
+        print(f"Unknown executable: {exec_name}")
 
 def print_schema() -> None:
     """Print the parameter schema in a readable format."""

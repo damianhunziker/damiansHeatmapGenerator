@@ -4,6 +4,7 @@ import time
 import inspect
 import os
 import pandas as pd
+from strategy_utils import print_logo, get_user_inputs, get_strategy_inputs, fetch_data, get_available_strategies
 
 print("Initializing Chart Analysis...")
 print_logo = None  # Placeholder für späteres Laden
@@ -289,6 +290,44 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     fig.show()
     
     return fig
+
+def create_chart(timeframe_data, params):
+    """Creates a chart using the provided timeframe data and parameters."""
+    # Initialize modules
+    initialize_modules()
+    
+    # Get strategy class
+    strategies = get_available_strategies()
+    strategy_found = False
+    
+    for _, (name, strategy_class) in strategies.items():
+        if name == params['strategy']:
+            strategy_found = True
+            # Create strategy parameters
+            strategy_params = {
+                'initial_equity': params.get('initial_equity', 10000),
+                'fee_pct': params.get('fee_pct', 0.04),
+                'start_date': params['start_date'],
+                'end_date': params['end_date']
+            }
+            
+            # Add any strategy-specific parameters
+            if hasattr(strategy_class, 'get_parameters'):
+                for param_name, (default_value, _) in strategy_class.get_parameters().items():
+                    strategy_params[param_name] = params.get(param_name, default_value)
+            
+            # Create chart
+            create_interactive_chart(
+                timeframe_data=timeframe_data,
+                strategy_class=strategy_class,
+                strategy_params=strategy_params,
+                last_n_candles_analyze=None,
+                last_n_candles_display=None
+            )
+            break
+    
+    if not strategy_found:
+        print(f"Error: Strategy {params['strategy']} not found")
 
 if __name__ == "__main__":
     initialize_modules()
