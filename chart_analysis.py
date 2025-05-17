@@ -11,26 +11,53 @@ print("Initializing Chart Analysis...")
 
 def create_interactive_chart(timeframe_data, strategy_class, strategy_params, last_n_candles_analyze, last_n_candles_display):
     """Creates an interactive Plotly chart with price movement and PnL curve"""
+    print("\n=== Debug: Strategy Initialization ===")
     # Initialize strategy with timeframe data
     strategy = strategy_class(**strategy_params)
     strategy.timeframe_data = timeframe_data  # Add timeframe data to strategy
+    print(f"Strategy class: {strategy.__class__.__name__}")
+    print(f"Strategy params: {strategy_params}")
     
     # Create analyzer with strategy and strategy_params
     analyzer = TradeAnalyzer(strategy, strategy_params)
     
     # Get primary timeframe data
     data = timeframe_data['primary']['data']
+    print(f"\nData shape: {data.shape}")
+    print(f"Data columns: {data.columns.tolist()}")
     
     # Get date range from strategy parameters
     start_date = strategy_params.get('start_date')
     end_date = strategy_params.get('end_date')
+    print(f"Date range: {start_date} to {end_date}")
     
     # If the strategy uses DivergenceDetector, set the date range
     if hasattr(strategy, 'divergence_detector'):
         strategy.divergence_detector.set_date_range(start_date, end_date)
     
+    print("\n=== Debug: Data Analysis ===")
     # Analyze data and get trades
     trades, display_data = analyzer.analyze_data(data, last_n_candles_analyze, last_n_candles_display)
+    print(f"Display data shape: {display_data.shape}")
+    print(f"Display data columns: {display_data.columns.tolist()}")
+    
+    # Check KAMA values
+    if 'entry_kama' in display_data.columns:
+        print("\n=== Debug: KAMA Values ===")
+        print(f"entry_kama first 5 values: {display_data['entry_kama'].head()}")
+        print(f"entry_kama last 5 values: {display_data['entry_kama'].tail()}")
+        print(f"entry_kama NaN count: {display_data['entry_kama'].isna().sum()}")
+    else:
+        print("\nWARNING: entry_kama not found in display_data columns!")
+    
+    if 'kama2' in display_data.columns:
+        print(f"\nkama2 first 5 values: {display_data['kama2'].head()}")
+        print(f"kama2 last 5 values: {display_data['kama2'].tail()}")
+        print(f"kama2 NaN count: {display_data['kama2'].isna().sum()}")
+    else:
+        print("\nWARNING: kama2 not found in display_data columns!")
+    
+    print(f"\nNumber of trades found: {len(trades)}")
     
     # Calculate equity curve for metrics
     equity_curve = [strategy_params['initial_equity']]
@@ -56,23 +83,27 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     print("\n=== Trade List ===")
     analyzer._print_trade_statistics(trades)
     
-    print("\nErstelle Chart...")
-    
+    print("\n=== Debug: Chart Creation ===")
     # Count available indicators for subplot layout
     available_indicators = [ind for ind in strategy.indicators if ind in display_data.columns]
     num_indicators = len(available_indicators)
+    print(f"Available indicators: {available_indicators}")
+    print(f"Number of indicators: {num_indicators}")
     
     # Calculate total number of rows needed (price chart + 3 KAMA delta charts + one row per indicator)
     total_rows = 1 + 3 + num_indicators  # Changed from 2 to 3 KAMA delta charts
+    print(f"Total subplot rows: {total_rows}")
     
-    # Calculate row heights (40% for price chart, 30% for KAMA deltas, remaining 30% divided among indicators)
+    # Calculate row heights
     row_heights = [0.4]  # Price chart
     kama_delta_height = 0.3 / 3  # Divide 30% among 3 KAMA delta charts
     row_heights.extend([kama_delta_height] * 3)  # Three KAMA delta charts
     if num_indicators > 0:
         indicator_height = 0.3 / num_indicators
         row_heights.extend([indicator_height] * num_indicators)
+    print(f"Row heights: {row_heights}")
     
+    print("\nCreating subplots...")
     # Create initial subplot layout
     fig = make_subplots(
         rows=total_rows,
@@ -82,6 +113,7 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
         row_heights=row_heights
     )
     
+    print("\nAdding candlestick chart...")
     # Candlestick Chart
     fig.add_trace(go.Candlestick(
         x=display_data.index,
@@ -92,6 +124,7 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
         name='OHLC'
     ), row=1, col=1)
     
+    print("\nAdding trade markers...")
     # Füge Trade Entry/Exit Markierungen hinzu
     entry_times = [trade[0] for trade in trades]
     entry_prices = [trade[2] for trade in trades]
@@ -161,23 +194,27 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
                 showlegend=False
             ), row=1, col=1)
     
+    print("\nAdding strategy traces...")
     # Füge strategie-spezifische Traces hinzu
     strategy.add_strategy_traces(fig, display_data)
     
+    print("\nAdding indicator traces...")
     # Indikatoren Chart (starting from row 2)
     strategy.add_indicator_traces(fig, display_data, row=2, col=1)
     
+    print("\nUpdating layout...")
     # Layout anpassen
     fig.update_layout(
         title='Price Chart with Signals and Indicators',
         yaxis_title='Price',
-        height=300 * total_rows,  # Increase base height per row for even better visibility
+        height=300 * total_rows,
         xaxis_rangeslider_visible=False
     )
     
     # Y-Achsen-Format anpassen
     fig.update_yaxes(title_text="Price", row=1, col=1)
     
+    print("\nShowing chart...")
     # Chart anzeigen
     fig.show()
     
