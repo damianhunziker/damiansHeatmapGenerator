@@ -1,121 +1,13 @@
 from tqdm import tqdm
 import sys
-import time
-import inspect
 import os
 import pandas as pd
 from strategy_utils import print_logo, get_user_inputs, get_strategy_inputs, fetch_data, get_available_strategies
+from classes.trade_analyzer import TradeAnalyzer
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
 print("Initializing Chart Analysis...")
-print_logo = None  # Placeholder für späteres Laden
-get_user_inputs = None  # Placeholder für späteres Laden
-get_strategy_inputs = None  # Placeholder für späteres Laden
-TradeAnalyzer = None  # Placeholder für TradeAnalyzer
-make_subplots = None  # Placeholder für make_subplots
-go = None  # Placeholder für plotly.graph_objects
-
-def show_loaded_modules():
-    """Zeigt bereits geladene System-Module"""
-    system_modules = [
-        name for name, module in sys.modules.items() 
-        if module and 
-        hasattr(module, '__file__') and 
-        module.__file__ and 
-        'site-packages' not in module.__file__ and
-        'lib/python' in module.__file__
-    ]
-    
-    print("\nLoaded System Modules:")
-    for module in tqdm(system_modules, desc="System Modules"):
-        tqdm.write(f"  - {module}")  # Verwende tqdm.write statt print
-        time.sleep(0.05)  # Kleine Verzögerung für bessere Lesbarkeit
-
-def get_imports_from_file(filename):
-    with open(filename, 'r') as file:
-        content = file.read()
-        
-    # Finde alle import Statements
-    imports = []
-    lines = content.split('\n')
-    for line in lines:
-        line = line.strip()
-        if line.startswith('from') or line.startswith('import'):
-            # Überspringe die tqdm, sys, time imports und leere Zeilen
-            if not any(x in line for x in ['tqdm', 'sys', 'time', 'inspect', 'os', 'plotly']) and '=' not in line and 'append' not in line:
-                # Entferne Kommentare
-                line = line.split('#')[0].strip()
-                if line:  # Nur wenn die Zeile nicht leer ist
-                    imports.append(line)
-    
-    # Konvertiere import statements in Module-Alias-Paare
-    modules = []
-    for imp in imports:
-        try:
-            if imp.startswith('from'):
-                # from module import name
-                parts = imp.split('import')
-                module = parts[0].replace('from', '').strip()
-                names = [n.strip() for n in parts[1].split(',')]
-                for name in names:
-                    if 'as' in name:
-                        # Handle "import x as y"
-                        name = name.split('as')[1].strip()
-                    if name and not name.startswith('=') and not 'append' in name:  # Prüfe auf gültige Namen
-                        modules.append((module, name))
-            else:
-                # import module
-                module = imp.replace('import', '').strip()
-                if 'as' in module:
-                    parts = module.split('as')
-                    if len(parts) == 2 and all(parts) and not 'append' in module:  # Prüfe auf gültige Module/Alias
-                        modules.append((parts[0].strip(), parts[1].strip()))
-                else:
-                    if module and not 'append' in module:  # Prüfe auf gültiges Modul
-                        modules.append((module, module))
-        except Exception as e:
-            print(f"Skipping invalid import statement: {imp}")
-            continue
-
-    return modules
-
-def initialize_modules():
-    global print_logo, get_user_inputs, get_strategy_inputs, TradeAnalyzer, make_subplots, go
-    
-    # Zeige zuerst die System-Module
-    show_loaded_modules()
-    
-    # Hole den Pfad der aktuellen Datei
-    current_file = os.path.abspath(__file__)
-
-    # Extrahiere die Module aus der Datei
-    modules = get_imports_from_file(current_file)
-
-    print("\nLoading modules:")
-    # Lade Module mit detailliertem Fortschrittsbalken
-    with tqdm(total=len(modules), desc="Progress", unit="module") as pbar:
-        # Lade zuerst die wichtigsten Module
-        from strategy_utils import print_logo, get_user_inputs, get_strategy_inputs
-        from classes.trade_analyzer import TradeAnalyzer
-        from plotly.subplots import make_subplots
-        import plotly.graph_objects as go
-        
-        for module, alias in modules:
-            try:
-                pbar.set_description(f"Loading {module}")
-                if isinstance(alias, list):
-                    # Für mehrere Imports aus einem Modul
-                    imports = ', '.join(alias)
-                    exec(f"from {module} import {imports}")
-                else:
-                    # Für einzelne Imports
-                    exec(f"from {module} import {alias}")
-                time.sleep(0.2)  # Längere Verzögerung für bessere Sichtbarkeit
-                pbar.update(1)
-            except ImportError as e:
-                print(f"\nError loading {module}: {e}")
-                sys.exit(1)
-
-    print("\nInitialization complete!\n")
 
 def create_interactive_chart(timeframe_data, strategy_class, strategy_params, last_n_candles_analyze, last_n_candles_display):
     """Creates an interactive Plotly chart with price movement and PnL curve"""
@@ -293,9 +185,6 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
 
 def create_chart(timeframe_data, params):
     """Creates a chart using the provided timeframe data and parameters."""
-    # Initialize modules
-    initialize_modules()
-    
     # Get strategy class
     strategies = get_available_strategies()
     strategy_found = False
@@ -330,16 +219,13 @@ def create_chart(timeframe_data, params):
         print(f"Error: Strategy {params['strategy']} not found")
 
 if __name__ == "__main__":
-    initialize_modules()
     print_logo()
-   
     print("CHART ANALYSE - Heatmap Generator and Strategy Backtester")
     
     # Get user inputs
     user_inputs = get_user_inputs()
-    print(f"\nChart Analysis - User Inputs - start_date: {user_inputs.get('start_date')}, end_date: {user_inputs.get('end_date')}")
     
-    # Strategie-spezifische Parameter abrufen
+    # Get strategy-specific parameters
     strategy_params = get_strategy_inputs(user_inputs['strategy_class'])
     strategy_params.update({
         'initial_equity': user_inputs['initial_equity'],
@@ -347,9 +233,8 @@ if __name__ == "__main__":
         'start_date': user_inputs['start_date'],
         'end_date': user_inputs['end_date']
     })
-    print(f"Chart Analysis - Strategy Params - start_date: {strategy_params.get('start_date')}, end_date: {strategy_params.get('end_date')}")
 
-    # Erstelle interaktives Diagramm
+    # Create interactive chart
     create_interactive_chart(
         user_inputs['timeframe_data'],
         user_inputs['strategy_class'], 
