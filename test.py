@@ -280,8 +280,25 @@ def run_executable(exec_name: str, params: Dict[str, Any]) -> None:
             print(f"Error: Strategy {params['strategy']} not found")
     
     elif exec_name == 'chart_analysis':
-        from chart_analysis import create_chart
-        create_chart(timeframe_data, params)
+        from chart_analysis import create_interactive_chart
+        strategies = get_available_strategies()
+        strategy_found = False
+        for _, (name, strategy_class) in strategies.items():
+            if name == params['strategy']:
+                strategy_found = True
+                # Add default initial_equity if not provided
+                if 'initial_equity' not in params:
+                    params['initial_equity'] = 10000
+                create_interactive_chart(
+                    timeframe_data=timeframe_data,
+                    strategy_class=strategy_class,
+                    strategy_params=params,
+                    last_n_candles_analyze=None,
+                    last_n_candles_display=None
+                )
+                break
+        if not strategy_found:
+            print(f"Error: Strategy {params['strategy']} not found")
     
     elif exec_name == 'fetcher':
         print(f"Data fetched and saved to {cache_file}")

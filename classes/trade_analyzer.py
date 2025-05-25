@@ -70,26 +70,38 @@ class TradeAnalyzer:
         entry_time = None
         entry_price = None
         current_equity = float(self.initial_equity)
+        current_direction = None
         
         for i in range(len(data)):
             current_time = data.index[i]
             current_price = float(data['price_close'].iloc[i])
             
-            if hasattr(data, 'short_entry'):
-                if not in_position and data['short_entry'].iloc[i]:
-                    entry_time = current_time
-                    entry_price = float(current_price)
-                    position_size = current_equity
-                    entry_fee = position_size * (self.fee_pct / 100)
-                    in_position = True
-                    trade_type = "SHORT"
-                elif in_position and data['short_exit'].iloc[i]:
+            # First check if we need to close an existing position due to opposite direction entry
+            if in_position:
+                should_close = False
+                exit_reason = None
+                
+                # Check for opposite direction entry signals
+                if current_direction == "LONG" and data['short_entry'].iloc[i]:
+                    should_close = True
+                    exit_reason = "Opposite Entry"
+                elif current_direction == "SHORT" and data['long_entry'].iloc[i]:
+                    should_close = True
+                    exit_reason = "Opposite Entry"
+                # Check for regular exit signals
+                elif current_direction == "LONG" and data['long_exit'].iloc[i]:
+                    should_close = True
+                    exit_reason = data['exit_reason'].iloc[i]
+                elif current_direction == "SHORT" and data['short_exit'].iloc[i]:
+                    should_close = True
+                    exit_reason = data['exit_reason'].iloc[i]
+                
+                if should_close:
                     exit_time = current_time
                     exit_price = float(current_price)
-                    exit_reason = data['exit_reason'].iloc[i]
                     
                     contracts = position_size / entry_price
-                    price_change = entry_price - exit_price
+                    price_change = exit_price - entry_price if current_direction == "LONG" else entry_price - exit_price
                     gross_profit = float(contracts * price_change)
                     
                     exit_position_size = position_size + gross_profit
@@ -105,49 +117,29 @@ class TradeAnalyzer:
                         net_profit,
                         gross_profit,
                         entry_fee + exit_fee,
-                        trade_type,
+                        current_direction,
                         exit_reason
                     ))
                     
                     current_equity += net_profit
                     in_position = False
             
-            if hasattr(data, 'long_entry'):
-                if not in_position and data['long_entry'].iloc[i]:
+            # Then check for new entries if we're not in a position
+            if not in_position:
+                if data['short_entry'].iloc[i]:
                     entry_time = current_time
                     entry_price = float(current_price)
                     position_size = current_equity
                     entry_fee = position_size * (self.fee_pct / 100)
                     in_position = True
-                    trade_type = "LONG"
-                elif in_position and data['long_exit'].iloc[i]:
-                    exit_time = current_time
-                    exit_price = float(current_price)
-                    exit_reason = data['exit_reason'].iloc[i]
-                    
-                    contracts = position_size / entry_price
-                    price_change = exit_price - entry_price
-                    gross_profit = float(contracts * price_change)
-                    
-                    exit_position_size = position_size + gross_profit
-                    exit_fee = exit_position_size * (self.fee_pct / 100)
-                    
-                    net_profit = gross_profit - entry_fee - exit_fee
-                    
-                    trades.append((
-                        entry_time,
-                        exit_time,
-                        entry_price,
-                        exit_price,
-                        net_profit,
-                        gross_profit,
-                        entry_fee + exit_fee,
-                        trade_type,
-                        exit_reason
-                    ))
-                    
-                    current_equity += net_profit
-                    in_position = False
+                    current_direction = "SHORT"
+                elif data['long_entry'].iloc[i]:
+                    entry_time = current_time
+                    entry_price = float(current_price)
+                    position_size = current_equity
+                    entry_fee = position_size * (self.fee_pct / 100)
+                    in_position = True
+                    current_direction = "LONG"
         
         return trades
     
@@ -175,8 +167,12 @@ class TradeAnalyzer:
             
             profit_pct = (net_profit / current_equity) * 100 if net_profit is not None else 0
             
-            print(f"{i:3d} | {trade_type:<6} | {entry_time.strftime('%Y-%m-%d %H:%M')} | "
-                  f"{exit_time.strftime('%Y-%m-%d %H:%M')} | "
+            # Format datetime objects or handle other types
+            entry_time_str = entry_time.strftime('%Y-%m-%d %H:%M') if hasattr(entry_time, 'strftime') else str(entry_time)
+            exit_time_str = exit_time.strftime('%Y-%m-%d %H:%M') if hasattr(exit_time, 'strftime') else str(exit_time)
+            
+            print(f"{i:3d} | {trade_type:<6} | {entry_time_str:<16} | "
+                  f"{exit_time_str:<16} | "
                   f"${entry_price:10.2f} | ${exit_price:10.2f} | "
                   f"${gross_profit:10.2f} | ${fees:8.2f} | ${net_profit:10.2f} | {profit_pct:8.2f}% | {exit_reason:<25}")
             
