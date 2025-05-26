@@ -295,39 +295,15 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
             base_indicator = indicator
             is_long = indicator in strategy.indicators
         
-        # Add long divergences to price chart
+        # Add long profile divergences to price chart - only BEARISH divergences
         if is_long and hasattr(strategy, 'divergence_results') and base_indicator in strategy.divergence_results:
             for div in strategy.divergence_results[base_indicator]:
-                if div['type'] == 'bullish':
+                if div['type'] == 'bearish':  # Long profile shows bearish divergences for exit signals
                     prev_time = strategy.divergence_detector.df.index[div['prev_price_idx']]
                     current_time = strategy.divergence_detector.df.index[div['price_idx']]
                     if prev_time not in display_data.index or current_time not in display_data.index:
                         continue
-                    prev_price = display_data['price_low'].loc[prev_time]
-                    curr_price = display_data['price_low'].loc[current_time]
-                    line_color = 'darkgreen' if div['status'] == 'confirmed' else 'lightgreen'
-                    
-                    # Add line with hover text
-                    fig.add_trace(go.Scatter(
-                        x=[prev_time, current_time],
-                        y=[prev_price, curr_price],
-                        mode='lines',
-                        line=dict(color=line_color, width=2, dash='dash'),
-                        name=f"Bullish Divergence ({base_indicator})",
-                        text=[f"Long {div['type']} divergence<br>Indicator: {base_indicator}<br>Status: {div['status']}"],
-                        hoverinfo='text',
-                        showlegend=False
-                    ), row=1, col=1)
-        
-        # Add short divergences to price chart
-        if not is_long and hasattr(strategy, 'short_divergence_results') and base_indicator in strategy.short_divergence_results:
-            for div in strategy.short_divergence_results[base_indicator]:
-                if div['type'] == 'bearish':
-                    prev_time = strategy.divergence_detector.df.index[div['prev_price_idx']]
-                    current_time = strategy.divergence_detector.df.index[div['price_idx']]
-                    if prev_time not in display_data.index or current_time not in display_data.index:
-                        continue
-                    prev_price = display_data['price_high'].loc[prev_time]
+                    prev_price = display_data['price_high'].loc[prev_time]  # Use high for bearish
                     curr_price = display_data['price_high'].loc[current_time]
                     line_color = 'darkred' if div['status'] == 'confirmed' else 'pink'
                     
@@ -338,7 +314,31 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
                         mode='lines',
                         line=dict(color=line_color, width=2, dash='dash'),
                         name=f"Bearish Divergence ({base_indicator})",
-                        text=[f"Short {div['type']} divergence<br>Indicator: {base_indicator}<br>Status: {div['status']}"],
+                        text=[f"Long profile {div['type']} divergence<br>Indicator: {base_indicator}<br>Status: {div['status']}"],
+                        hoverinfo='text',
+                        showlegend=False
+                    ), row=1, col=1)
+        
+        # Add short profile divergences to price chart - only BULLISH divergences
+        if not is_long and hasattr(strategy, 'short_divergence_results') and base_indicator in strategy.short_divergence_results:
+            for div in strategy.short_divergence_results[base_indicator]:
+                if div['type'] == 'bullish':  # Short profile shows bullish divergences for exit signals
+                    prev_time = strategy.short_divergence_detector.df.index[div['prev_price_idx']]
+                    current_time = strategy.short_divergence_detector.df.index[div['price_idx']]
+                    if prev_time not in display_data.index or current_time not in display_data.index:
+                        continue
+                    prev_price = display_data['price_low'].loc[prev_time]  # Use low for bullish
+                    curr_price = display_data['price_low'].loc[current_time]
+                    line_color = 'darkgreen' if div['status'] == 'confirmed' else 'lightgreen'
+                    
+                    # Add line with hover text
+                    fig.add_trace(go.Scatter(
+                        x=[prev_time, current_time],
+                        y=[prev_price, curr_price],
+                        mode='lines',
+                        line=dict(color=line_color, width=2, dash='dash'),
+                        name=f"Bullish Divergence ({base_indicator})",
+                        text=[f"Short profile {div['type']} divergence<br>Indicator: {base_indicator}<br>Status: {div['status']}"],
                         hoverinfo='text',
                         showlegend=False
                     ), row=1, col=1)
@@ -403,16 +403,16 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
             
             # Add divergence lines based on whether this is long or short
             if is_long and hasattr(strategy, 'divergence_results') and base_indicator in strategy.divergence_results:
-                # Long divergences
+                # Long profile divergences - show only BEARISH divergences (for exit signals)
                 for div in strategy.divergence_results[base_indicator]:
-                    if div['type'] == 'bullish':  # Only show bullish for long
+                    if div['type'] == 'bearish':  # Only show bearish for long profile
                         prev_time = strategy.divergence_detector.df.index[div['prev_price_idx']]
                         current_time = strategy.divergence_detector.df.index[div['price_idx']]
                         if prev_time not in display_data.index or current_time not in display_data.index:
                             continue
                         prev_val = display_data[base_indicator].loc[prev_time]
                         curr_val = display_data[base_indicator].loc[current_time]
-                        line_color = 'darkgreen' if div['status'] == 'confirmed' else 'lightgreen'
+                        line_color = 'darkred' if div['status'] == 'confirmed' else 'pink'
                         fig.add_shape(
                             type='line',
                             x0=prev_time,
@@ -424,16 +424,16 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
                         )
             
             if not is_long and hasattr(strategy, 'short_divergence_results') and base_indicator in strategy.short_divergence_results:
-                # Short divergences
+                # Short profile divergences - show only BULLISH divergences (for exit signals)
                 for div in strategy.short_divergence_results[base_indicator]:
-                    if div['type'] == 'bearish':  # Only show bearish for short
-                        prev_time = strategy.divergence_detector.df.index[div['prev_price_idx']]
-                        current_time = strategy.divergence_detector.df.index[div['price_idx']]
+                    if div['type'] == 'bullish':  # Only show bullish for short profile
+                        prev_time = strategy.short_divergence_detector.df.index[div['prev_price_idx']]
+                        current_time = strategy.short_divergence_detector.df.index[div['price_idx']]
                         if prev_time not in display_data.index or current_time not in display_data.index:
                             continue
                         prev_val = display_data[base_indicator].loc[prev_time]
                         curr_val = display_data[base_indicator].loc[current_time]
-                        line_color = 'darkred' if div['status'] == 'confirmed' else 'pink'
+                        line_color = 'darkgreen' if div['status'] == 'confirmed' else 'lightgreen'
                         fig.add_shape(
                             type='line',
                             x0=prev_time,
