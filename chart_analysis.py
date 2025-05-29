@@ -123,18 +123,49 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     
     print(f"Divergence indicators: {divergence_indicators}")
     
-    # Calculate total number of rows needed (price chart + 2 KAMA delta charts + one row per divergence indicator)
+    # Check if Fusion Range Filter is enabled
+    use_fusion_filter = strategy_params.get('use_fusion_for_long', False)
+    
+    # Calculate total number of rows needed (price chart + 2 KAMA delta charts + fusion filter + one row per divergence indicator)
     total_rows = 1 + 2 + len(divergence_indicators)
+    if use_fusion_filter:
+        total_rows += 1  # Add row for Fusion Range Filter
     print(f"Total subplot rows: {total_rows}")
     
-    # Calculate row heights
-    row_heights = [0.4]  # Price chart
-    kama_delta_height = 0.3 / 2  # Divide 30% among 2 KAMA delta charts
-    row_heights.extend([kama_delta_height] * 2)  # Two KAMA delta charts
-    if len(divergence_indicators) > 0:
-        indicator_height = 0.3 / len(divergence_indicators)
-        row_heights.extend([indicator_height] * len(divergence_indicators))
+    # Calculate row heights - indicators now get much more space
+    # Price chart gets about 30%, indicators get majority of space (70% total)
+    price_chart_ratio = 0.3   # Price chart gets 30% of total height
+    remaining_ratio = 0.7      # All other subplots share 70% (much more space for indicators)
+    
+    row_heights = [price_chart_ratio]  # Price chart gets 30%
+    
+    # Calculate heights for remaining subplots
+    remaining_subplots = total_rows - 1  # Exclude price chart
+    if remaining_subplots > 0:
+        subplot_height = remaining_ratio / remaining_subplots
+        
+        # KAMA delta charts
+        row_heights.extend([subplot_height] * 2)  # Two KAMA delta charts
+        
+        # Add Fusion Range Filter row if enabled
+        if use_fusion_filter:
+            row_heights.append(subplot_height)  # Fusion filter gets same height as others
+        
+        # Divergence indicators
+        if len(divergence_indicators) > 0:
+            row_heights.extend([subplot_height] * len(divergence_indicators))
+    
     print(f"Row heights: {row_heights}")
+    
+    # Create subplot titles
+    subplot_titles = ['Price', 'Entry KAMA Delta', 'Exit KAMA Delta']
+    if use_fusion_filter:
+        subplot_titles.append('Fusion Range Filter')
+    
+    subplot_titles.extend([f"{ind.split('_')[0]} (Long)" if ind.endswith('_long') else 
+                          f"{ind.split('_')[0]} (Short)" if ind.endswith('_short') else
+                          f"{ind} (Long)" if ind in strategy.indicators else f"{ind} (Short)" 
+                          for ind in divergence_indicators])
     
     print("\nCreating subplots...")
     # Create initial subplot layout
@@ -142,13 +173,9 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
         rows=total_rows,
         cols=1,
         shared_xaxes=True,
-        vertical_spacing=0.03,
+        vertical_spacing=0.02,  # Increased from 0.01 to 0.02 for better spacing
         row_heights=row_heights,
-        subplot_titles=(['Price'] + ['Entry KAMA Delta', 'Exit KAMA Delta'] + 
-                       [f"{ind.split('_')[0]} (Long)" if ind.endswith('_long') else 
-                        f"{ind.split('_')[0]} (Short)" if ind.endswith('_short') else
-                        f"{ind} (Long)" if ind in strategy.indicators else f"{ind} (Short)" 
-                        for ind in divergence_indicators])
+        subplot_titles=subplot_titles
     )
     
     print("\nAdding candlestick chart...")
@@ -185,6 +212,139 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
             name='DEMA',
             line=dict(color='purple', width=1)
         ), row=1, col=1)
+    
+    # Add Fusion Range Filter background coloring and indicator if enabled
+    if use_fusion_filter and hasattr(strategy, 'fusion_range_filter'):
+        print("\nAdding Fusion Range Filter background and indicator...")
+        
+        # Calculate Fusion Range Filter values once and reuse the tuple results
+        fusion_ma, fusion_atr, fusion_cond = strategy.fusion_range_filter.calculate(display_data)
+        
+        print(f"   Fusion values calculated:")
+        print(f"   MA range: {fusion_ma.min():.4f} to {fusion_ma.max():.4f}")
+        print(f"   ATR range: {fusion_atr.min():.4f} to {fusion_atr.max():.4f}")
+        print(f"   Condition True count: {fusion_cond.sum()}/{len(fusion_cond)} ({fusion_cond.sum()/len(fusion_cond)*100:.1f}%)")
+        
+        # Add background color for each candle where fusion condition is True (MA > ATR)
+        # Get chart bounds for background rectangles
+        chart_min = display_data['price_low'].min() * 0.98
+        chart_max = display_data['price_high'].max() * 1.02
+        
+        # Use a more efficient approach by grouping consecutive True values
+        i = 0
+        background_rectangles = 0
+        while i < len(display_data):
+            if fusion_cond.iloc[i]:
+                # Find the end of consecutive True values
+                start_idx = i
+                while i < len(display_data) and fusion_cond.iloc[i]:
+                    i += 1
+                end_idx = i - 1
+                
+                # Calculate time boundaries
+                start_time = display_data.index[start_idx]
+                if end_idx + 1 < len(display_data):
+                    end_time = display_data.index[end_idx + 1]
+                else:
+                    # For the last candle, estimate the end time
+                    time_diff = display_data.index[end_idx] - display_data.index[end_idx - 1] if end_idx > 0 else pd.Timedelta(hours=4)
+                    end_time = display_data.index[end_idx] + time_diff
+                
+                # Add a single rectangle for consecutive True values
+                fig.add_shape(
+                    type="rect",
+                    x0=start_time,
+                    x1=end_time,
+                    y0=chart_min,
+                    y1=chart_max,
+                    fillcolor="rgba(128, 128, 128, 0.3)",  # Light gray with 30% opacity
+                    line=dict(width=0),
+                    layer="below",  # This ensures it's drawn below the candlesticks
+                    row=1, col=1
+                )
+                background_rectangles += 1
+            else:
+                i += 1
+        
+        print(f"   Added {background_rectangles} background rectangles")
+        
+        # Add Fusion Range Filter indicator subplot with comprehensive visualization
+        fusion_row = 4  # After price, entry delta, exit delta
+        
+        # Add Fusion MA line (blue) - this is the HMA value
+        fig.add_trace(go.Scatter(
+            x=display_data.index,
+            y=fusion_ma,
+            name=f'Fusion MA ({strategy.fusion_range_filter.hma_mode})',
+            line=dict(color='blue', width=2),
+            hovertemplate='<b>Fusion MA</b><br>' +
+                          'Time: %{x}<br>' +
+                          'Value: %{y:.4f}<br>' +
+                          f'Mode: {strategy.fusion_range_filter.hma_mode}<br>' +
+                          f'Length: {strategy.fusion_range_filter.hma_length}<extra></extra>'
+        ), row=fusion_row, col=1)
+        
+        # Add Scaled ATR limit line (red, dashed) - this is the scaled ATR threshold
+        fig.add_trace(go.Scatter(
+            x=display_data.index,
+            y=fusion_atr,
+            name=f'ATR Limit (x{strategy.fusion_range_filter.scaling_factor})',
+            line=dict(color='red', width=2, dash='dash'),
+            hovertemplate='<b>ATR Limit</b><br>' +
+                          'Time: %{x}<br>' +
+                          'Value: %{y:.4f}<br>' +
+                          f'ATR Length: {strategy.fusion_range_filter.atr_length}<br>' +
+                          f'Scaling: {strategy.fusion_range_filter.scaling_factor}x<br>' +
+                          'Condition: MA > ATR when True<extra></extra>'
+        ), row=fusion_row, col=1)
+        
+        # Add condition indicator as filled area between MA and ATR when condition is True
+        # Create arrays for the filled area
+        x_fill = []
+        y_upper = []
+        y_lower = []
+        
+        for i in range(len(display_data)):
+            if fusion_cond.iloc[i]:  # When condition is True (MA > ATR)
+                x_fill.append(display_data.index[i])
+                y_upper.append(max(fusion_ma.iloc[i], fusion_atr.iloc[i]))
+                y_lower.append(min(fusion_ma.iloc[i], fusion_atr.iloc[i]))
+        
+        if len(x_fill) > 0:
+            # Add filled area to show when condition is active
+            fig.add_trace(go.Scatter(
+                x=x_fill + x_fill[::-1],  # x coordinates for fill
+                y=y_upper + y_lower[::-1],  # y coordinates for fill
+                fill='toself',
+                fillcolor='rgba(128, 128, 128, 0.2)',  # Light gray fill
+                line=dict(color='rgba(255,255,255,0)'),  # Transparent line
+                name='Active Condition',
+                showlegend=True,
+                hoverinfo='skip'
+            ), row=fusion_row, col=1)
+        
+        # Add zero reference line for better orientation
+        fig.add_hline(
+            y=0, 
+            line_dash="dot", 
+            line_color="gray", 
+            opacity=0.5,
+            row=fusion_row, 
+            col=1
+        )
+        
+        # Update y-axis with detailed title
+        fig.update_yaxes(
+            title_text=f"Fusion Range Filter<br>" +
+                       f"({strategy.fusion_range_filter.hma_mode} vs ATR×{strategy.fusion_range_filter.scaling_factor})",
+            row=fusion_row, 
+            col=1
+        )
+        
+        print(f"   Successfully added Fusion Range Filter subplot to row {fusion_row}")
+        print(f"   Added traces: MA line, ATR limit line, active condition fill")
+        active_periods = fusion_cond.sum()
+        print(f"   Active periods: {active_periods}/{len(fusion_cond)} ({active_periods/len(fusion_cond)*100:.1f}%)")
     
     print("\nAdding trade markers...")
     # Add Trade Entry/Exit markers
@@ -378,7 +538,10 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     print("\nAdding divergence indicator traces...")
     # --- Add divergence indicator subplots ---
     for idx, indicator in enumerate(divergence_indicators):
-        subplot_row = 4 + idx  # Start after KAMA delta plots (1 price + 2 KAMA deltas + idx)
+        # Calculate subplot row: 1 price + 2 KAMA deltas + fusion filter (if enabled) + idx
+        subplot_row = 4 + idx
+        if use_fusion_filter:
+            subplot_row += 1  # Add 1 for fusion filter row
         
         # Handle special case for ADP
         if indicator == 'adp_long':
@@ -444,13 +607,230 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
                             row=subplot_row, col=1
                         )
     
+    print("\nAdding pivot points...")
+    # Add pivot points to the price chart
+    if hasattr(strategy, 'divergence_detector') and hasattr(strategy.divergence_detector, 'df'):
+        print("   Adding long profile pivot points (high pivots)...")
+        detector_df = strategy.divergence_detector.df
+        
+        try:
+            high_pivots_result = strategy.divergence_detector.pivot(
+                detector_df, 
+                strategy.divergence_detector.long_prd, 
+                strategy.divergence_detector.long_prd, 
+                'high', 
+                source='High/Low',
+                pivot_limit=strategy.divergence_detector.pivot_limit
+            )
+            
+            # Extract indices from the tuple (indices, values)
+            if isinstance(high_pivots_result, tuple) and len(high_pivots_result) == 2:
+                high_pivot_indices, high_pivot_values = high_pivots_result
+                print(f"   Found {len(high_pivot_indices)} high pivots for long profile")
+                print(f"   High pivot indices: {high_pivot_indices}")
+                print(f"   High pivot values: {high_pivot_values}")
+            else:
+                high_pivot_indices = high_pivots_result
+                print(f"   Found {len(high_pivot_indices)} high pivots for long profile")
+            
+            # Add pivot high markers
+            added_high_pivots = 0
+            
+            # Handle both list and numpy array cases
+            if hasattr(high_pivot_indices, '__iter__'):
+                for pivot_idx in high_pivot_indices:
+                    # Convert to int if it's a numpy type
+                    if hasattr(pivot_idx, 'item'):
+                        pivot_idx = pivot_idx.item()
+                    
+                    print(f"   Processing pivot_idx: {pivot_idx} (type: {type(pivot_idx)})")
+                    
+                    if isinstance(pivot_idx, (int, float)) and pivot_idx < len(detector_df):
+                        current_time = detector_df.index[int(pivot_idx)]
+                        current_high = detector_df['price_high'].iloc[int(pivot_idx)]
+                        
+                        print(f"   Pivot at {current_time}: {current_high}")
+                        
+                        if current_time in display_data.index:
+                            fig.add_trace(go.Scatter(
+                                x=[current_time],
+                                y=[current_high],
+                                mode='markers',
+                                marker=dict(
+                                    symbol='triangle-down',
+                                    size=12,
+                                    color='darkred',
+                                    line=dict(color='red', width=2)
+                                ),
+                                name='Long Profile Pivot High',
+                                legendgroup='long_pivots',
+                                hovertext=f'Long Pivot High<br>Price: {current_high:.2f}<br>Period: {strategy.divergence_detector.long_prd}',
+                                hoverinfo='text',
+                                showlegend=False
+                            ), row=1, col=1)
+                            added_high_pivots += 1
+                            print(f"   Added pivot marker at {current_time}")
+                        else:
+                            print(f"   Pivot time {current_time} not in display_data")
+            
+            print(f"   Successfully added {added_high_pivots} high pivot markers")
+                        
+        except Exception as e:
+            print(f"   Error finding long profile pivots: {e}")
+    
+    if hasattr(strategy, 'short_divergence_detector') and hasattr(strategy.short_divergence_detector, 'df'):
+        print("   Adding short profile pivot points (low pivots)...")
+        detector_df = strategy.short_divergence_detector.df
+        
+        try:
+            low_pivots_result = strategy.short_divergence_detector.pivot(
+                detector_df, 
+                strategy.short_divergence_detector.short_prd, 
+                strategy.short_divergence_detector.short_prd, 
+                'low', 
+                source='High/Low',
+                pivot_limit=strategy.short_divergence_detector.pivot_limit
+            )
+            
+            # Extract indices from the tuple (indices, values)
+            if isinstance(low_pivots_result, tuple) and len(low_pivots_result) == 2:
+                low_pivot_indices, low_pivot_values = low_pivots_result
+                print(f"   Found {len(low_pivot_indices)} low pivots for short profile")
+                print(f"   Low pivot indices: {low_pivot_indices}")
+                print(f"   Low pivot values: {low_pivot_values}")
+            else:
+                low_pivot_indices = low_pivots_result
+                print(f"   Found {len(low_pivot_indices)} low pivots for short profile")
+            
+            # Add pivot low markers
+            added_low_pivots = 0
+            
+            # Handle both list and numpy array cases
+            if hasattr(low_pivot_indices, '__iter__'):
+                for pivot_idx in low_pivot_indices:
+                    # Convert to int if it's a numpy type
+                    if hasattr(pivot_idx, 'item'):
+                        pivot_idx = pivot_idx.item()
+                    
+                    print(f"   Processing pivot_idx: {pivot_idx} (type: {type(pivot_idx)})")
+                    
+                    if isinstance(pivot_idx, (int, float)) and pivot_idx < len(detector_df):
+                        current_time = detector_df.index[int(pivot_idx)]
+                        current_low = detector_df['price_low'].iloc[int(pivot_idx)]
+                        
+                        print(f"   Pivot at {current_time}: {current_low}")
+                        
+                        if current_time in display_data.index:
+                            fig.add_trace(go.Scatter(
+                                x=[current_time],
+                                y=[current_low],
+                                mode='markers',
+                                marker=dict(
+                                    symbol='triangle-up',
+                                    size=12,
+                                    color='darkgreen',
+                                    line=dict(color='green', width=2)
+                                ),
+                                name='Short Profile Pivot Low',
+                                legendgroup='short_pivots',
+                                hovertext=f'Short Pivot Low<br>Price: {current_low:.2f}<br>Period: {strategy.short_divergence_detector.short_prd}',
+                                hoverinfo='text',
+                                showlegend=False
+                            ), row=1, col=1)
+                            added_low_pivots += 1
+                            print(f"   Added pivot marker at {current_time}")
+                        else:
+                            print(f"   Pivot time {current_time} not in display_data")
+            
+            print(f"   Successfully added {added_low_pivots} low pivot markers")
+                        
+        except Exception as e:
+            print(f"   Error finding short profile pivots: {e}")
+
+    print("\nAdding pivot point control buttons...")
+    # Generate visibility masks for buttons
+    def get_visibility_mask(fig, pivot_type, show):
+        """Generate visibility mask for pivot points"""
+        visibility = []
+        for trace in fig.data:
+            legendgroup = trace.legendgroup if hasattr(trace, 'legendgroup') else ''
+            
+            if pivot_type == "long_pivots":
+                if legendgroup == 'long_pivots':
+                    visibility.append(show)
+                else:
+                    visibility.append(True)  # Keep other traces visible
+            elif pivot_type == "short_pivots":
+                if legendgroup == 'short_pivots':
+                    visibility.append(show)
+                else:
+                    visibility.append(True)  # Keep other traces visible
+            else:
+                visibility.append(True)
+        return visibility
+    
+    # Create buttons for pivot point visibility - only 2 buttons
+    def get_all_pivots_visibility_mask(fig, show):
+        """Generate visibility mask for all pivot points"""
+        visibility = []
+        for trace in fig.data:
+            legendgroup = trace.legendgroup if hasattr(trace, 'legendgroup') else ''
+            
+            if legendgroup in ['long_pivots', 'short_pivots']:
+                visibility.append(show)
+            else:
+                visibility.append(True)  # Keep other traces visible
+        return visibility
+    
+    all_show_mask = get_all_pivots_visibility_mask(fig, True)
+    all_hide_mask = get_all_pivots_visibility_mask(fig, False)
+    
+    buttons = [
+        dict(
+            args=[{"visible": all_hide_mask}],
+            label="Hide Pivot Points",
+            method="restyle"
+        ),
+        dict(
+            args=[{"visible": all_show_mask}],
+            label="Show Pivot Points",
+            method="restyle"
+        ),
+    ]
+    
+    print(f"   Created {len(buttons)} control buttons")
+
     print("\nUpdating layout...")
+    # Calculate optimal height - price chart should be about 100% of screen height
+    # Each indicator subplot should be about 1/2 of window height (tripled from 133px to 400px)
+    # Use a maximum of 3000px for total chart height
+    price_chart_height = 800  # About 120% of typical browser viewport
+    indicator_height = 400    # Tripled from 133px to 400px (1/2 of 800px window height)
+    total_indicator_height = (total_rows - 1) * indicator_height
+    calculated_height = price_chart_height + total_indicator_height
+    optimal_height = min(calculated_height, 3000)  # Cap at 3000px (increased from 1800px)
+    
+    print(f"Chart height calculation: {total_rows} rows, price: {price_chart_height}px, indicators: {total_indicator_height}px, total: {calculated_height}px, optimal: {optimal_height}px")
+    
     # Update layout
     fig.update_layout(
         title='Price Chart with Signals and Indicators',
         yaxis_title='Price',
-        height=300 * total_rows,
-        xaxis_rangeslider_visible=False
+        height=optimal_height,  # Use optimal height instead of fixed calculation
+        xaxis_rangeslider_visible=False,
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="left",
+                buttons=buttons,
+                pad={"r": 10, "t": 10},
+                showactive=True,
+                x=0.01,
+                xanchor="left",
+                y=1.02,
+                yanchor="top"
+            ),
+        ]
     )
     
     # Update y-axis titles
@@ -460,7 +840,11 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     
     # Update y-axis titles for divergence indicators
     for idx, indicator in enumerate(divergence_indicators):
+        # Calculate subplot row: 1 price + 2 KAMA deltas + fusion filter (if enabled) + idx
         subplot_row = 4 + idx
+        if use_fusion_filter:
+            subplot_row += 1  # Add 1 for fusion filter row
+        
         # Get base indicator name without the _long/_short suffix
         base_indicator = indicator.split('_')[0] if '_' in indicator else indicator
         indicator_type = 'Long' if indicator.endswith('_long') or indicator in strategy.indicators else 'Short'

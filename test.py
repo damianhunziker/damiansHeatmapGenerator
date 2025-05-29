@@ -7,6 +7,9 @@ from datetime import datetime, timedelta
 import os
 from strategy_utils import get_available_strategies
 import pandas as pd
+import numpy as np
+from classes.strategies.live_kama_ssl_strategy import LiveKAMASSLStrategy
+import yfinance as yf
 
 def get_class_init_params(module_name: str, class_name: str) -> Dict[str, Any]:
     """Get initialization parameters for a class from a module."""
@@ -248,7 +251,18 @@ def run_executable(exec_name: str, params: Dict[str, Any]) -> None:
         for _, (name, strategy_class) in strategies.items():
             if name == params['strategy']:
                 strategy_found = True
-                create_interactive_chart(timeframe_data, strategy_class, params)
+                # Add default initial_equity and fee_pct if not provided
+                if 'initial_equity' not in params:
+                    params['initial_equity'] = 10000
+                if 'fee_pct' not in params:
+                    params['fee_pct'] = 0.04
+                create_interactive_chart(
+                    timeframe_data=timeframe_data,
+                    strategy_class=strategy_class,
+                    strategy_params=params,
+                    last_n_candles_analyze=None,
+                    last_n_candles_display=None
+                )
                 break
         if not strategy_found:
             print(f"Error: Strategy {params['strategy']} not found")
@@ -344,6 +358,120 @@ def print_schema() -> None:
             default = f", Default: {param_info['default']}" if param_info.get('default') is not None else ""
             description = f" - {param_info['description']}" if 'description' in param_info else ""
             print(f"- {param_name} ({required}{default}){description}")
+
+def test_fusion_range_filter():
+    print("\n=== Starting Fusion Range Filter Test ===")
+    print("="*50)
+    
+    # Use local cached data instead of downloading
+    print("\nLoading cached data...")
+    df = pd.read_csv('ohlc_cache/BTCUSDT_4h_ohlc.csv')
+    
+    # Convert timestamp to datetime index
+    df['time_period_start'] = pd.to_datetime(df['time_period_start'])
+    df.set_index('time_period_start', inplace=True)
+    
+    # Filter to a specific date range
+    start_date = '2023-01-01'
+    end_date = '2024-01-01'
+    df = df[start_date:end_date]
+    
+    print(f"\nData loaded:")
+    print(f"Date range: {df.index.min()} to {df.index.max()}")
+    print(f"Data shape: {df.shape}")
+    
+    # Initialize strategy with debug mode and fusion range filter enabled
+    strategy = LiveKAMASSLStrategy(
+        debug_mode=True,
+        use_fusion_for_long=True,
+        atr_length=9,
+        hma_mode='VWMA',
+        hma_length=50,
+        atr_scaling_factor=1.4,
+        trade_direction='long'  # Test only long trades since fusion filter is for longs
+    )
+    
+    print("\nStrategy initialized with parameters:")
+    print("- Debug mode: True")
+    print("- Use fusion for long: True")
+    print("- ATR length: 9")
+    print("- HMA mode: VWMA")
+    print("- HMA length: 50")
+    print("- ATR scaling factor: 1.4")
+    print("- Trade direction: long")
+    
+    # Prepare data and calculate indicators
+    print("\nPreparing data and calculating indicators...")
+    prepared_data = strategy.prepare_signals(df)
+    
+    # Create figure to visualize the signals
+    print("\nCreating visualization...")
+    fig = strategy.create_figure(prepared_data)
+    
+    # Analyze fusion range filter conditions
+    print("\nAnalyzing Fusion Range Filter conditions:")
+    fusion_ma, fusion_atr, fusion_cond = strategy.fusion_range_filter.calculate(prepared_data)
+    
+    print(f"\nFusion Range Filter Statistics:")
+    print(f"MA range: {fusion_ma.min():.2f} to {fusion_ma.max():.2f}")
+    print(f"ATR range: {fusion_atr.min():.2f} to {fusion_atr.max():.2f}")
+    print(f"True conditions: {fusion_cond.sum()} out of {len(fusion_cond)} ({fusion_cond.mean()*100:.2f}%)")
+    
+    # Check if we have any long entry signals
+    long_entries = prepared_data['long_entry'].sum()
+    print(f"\nLong entry signals: {long_entries}")
+    
+    if long_entries == 0:
+        print("\nWARNING: No long entry signals found. This might indicate an issue with the Fusion Range Filter.")
+        print("\nAnalyzing potential entry conditions:")
+        for i in range(1, len(prepared_data)):
+            current_candle = prepared_data.iloc[i]
+            
+            # Check trend condition
+            trend_condition = current_candle['exit_kama'] > current_candle['kama2']
+            
+            # Check KAMA delta condition
+            kama_delta_condition = current_candle['entry_kama_delta'] > current_candle['entry_kama_delta_limit']
+            
+            # Check BB condition
+            bb_condition = current_candle['price_close'] > current_candle['bb_basis']
+            
+            # Check fusion condition
+            fusion_condition = fusion_cond.iloc[i]
+            
+            # If all conditions except fusion are met
+            if trend_condition and kama_delta_condition and bb_condition:
+                print(f"\nPotential entry at {prepared_data.index[i]}:")
+                print(f"Trend condition (exit_kama > kama2): {trend_condition}")
+                print(f"KAMA delta condition: {kama_delta_condition}")
+                print(f"BB condition: {bb_condition}")
+                print(f"Fusion condition: {fusion_condition}")
+                print(f"Exit KAMA: {current_candle['exit_kama']:.2f}")
+                print(f"KAMA2: {current_candle['kama2']:.2f}")
+                print(f"Entry KAMA Delta: {current_candle['entry_kama_delta']:.2f}")
+                print(f"Entry KAMA Delta Limit: {current_candle['entry_kama_delta_limit']:.2f}")
+                print(f"Close price: {current_candle['price_close']:.2f}")
+                print(f"BB basis: {current_candle['bb_basis']:.2f}")
+                print(f"Fusion MA: {fusion_ma.iloc[i]:.2f}")
+                print(f"Fusion ATR: {fusion_atr.iloc[i]:.2f}")
+    else:
+        print("\nAnalyzing long entry signals:")
+        entry_indices = prepared_data[prepared_data['long_entry']].index
+        for idx in entry_indices:
+            i = prepared_data.index.get_loc(idx)
+            print(f"\nEntry at {idx}:")
+            print(f"Fusion condition: {fusion_cond.iloc[i]}")
+            print(f"MA value: {fusion_ma.iloc[i]:.2f}")
+            print(f"ATR value: {fusion_atr.iloc[i]:.2f}")
+            print(f"Close price: {prepared_data['price_close'].iloc[i]:.2f}")
+            print(f"BB basis: {prepared_data['bb_basis'].iloc[i]:.2f}")
+            print(f"Exit KAMA: {prepared_data['exit_kama'].iloc[i]:.2f}")
+            print(f"KAMA2: {prepared_data['kama2'].iloc[i]:.2f}")
+            print(f"Entry KAMA Delta: {prepared_data['entry_kama_delta'].iloc[i]:.2f}")
+            print(f"Entry KAMA Delta Limit: {prepared_data['entry_kama_delta_limit'].iloc[i]:.2f}")
+    
+    print("\nTest completed!")
+    print("="*50)
 
 def main():
     """Main function to handle command line arguments."""

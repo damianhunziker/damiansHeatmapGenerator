@@ -387,7 +387,7 @@ def create_performance_chart(timestamps, pnl_performance, buy_hold, drawdown, ou
     )
     
     # Update Layout
-    title = f'Strategy vs Buy & Hold Performance for params: {params}' if params else 'Strategy Performance with Drawdown'
+    title = params if params else 'Strategy Performance with Drawdown'
     fig.update_layout(
         title=title,
         height=900,  # Erhöhe die Höhe für zwei Subplots
