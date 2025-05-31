@@ -86,6 +86,194 @@ def analyze_direction(timeframe_data, strategy_class, strategy_params, direction
         'direction': direction
     }
 
+def calculate_realistic_direction_metrics(both_results, target_direction):
+    """
+    Berechnet realistische Metriken für Long/Short Only basierend auf der realen Both-Equity-Kurve
+    """
+    if not both_results or not both_results['trades']:
+        return None
+    
+    # Filter trades für die gewünschte Richtung aus der Both-Analyse
+    direction_trades = []
+    for trade in both_results['trades']:
+        if len(trade) >= 8:  # Vollständige Trade-Information
+            trade_type = trade[7]  # LONG oder SHORT
+            if (target_direction == 'long' and trade_type == 'LONG') or \
+               (target_direction == 'short' and trade_type == 'SHORT'):
+                direction_trades.append(trade)
+    
+    if not direction_trades:
+        return None
+    
+    # Berechne realistische Equity-Kurve basierend auf der Both-Analyse
+    # Starte mit der initialen Equity
+    initial_equity = 10000  # Standard Initial Equity
+    current_equity = initial_equity
+    direction_equity_curve = [initial_equity]
+    direction_timestamps = [both_results['equity_curve_timestamps'][0]]
+    
+    # Gehe durch alle Both-Trades und berücksichtige nur die der gewünschten Richtung
+    for trade in both_results['trades']:
+        if trade[4] is not None:  # Nur abgeschlossene Trades
+            trade_type = trade[7]
+            # Wenn dieser Trade zur gewünschten Richtung gehört, füge ihn zur Equity hinzu
+            if (target_direction == 'long' and trade_type == 'LONG') or \
+               (target_direction == 'short' and trade_type == 'SHORT'):
+                net_profit = trade[4]
+                current_equity += net_profit
+                direction_equity_curve.append(current_equity)
+                direction_timestamps.append(trade[1])  # Exit time
+    
+    # Berechne Performance-Metriken für diese realistische Equity-Kurve
+    pnl_performance = [(eq / initial_equity - 1) * 100 for eq in direction_equity_curve]
+    
+    # Berechne Buy & Hold Performance basierend auf den Both-Results Timestamps
+    # Verwende die gleichen Zeitpunkte wie in both_results, aber nur für direction trades
+    buy_hold = []
+    if len(direction_timestamps) > 0 and len(both_results['buy_hold']) > 0:
+        # Erstelle buy_hold basierend auf den direction timestamps
+        # Finde die entsprechenden Indizes in both_results für unsere timestamps
+        both_timestamps = both_results['equity_curve_timestamps']
+        both_buy_hold = both_results['buy_hold']
+        
+        for direction_timestamp in direction_timestamps:
+            # Finde den nächsten entsprechenden Zeitstempel in both_results
+            closest_idx = None
+            min_diff = None
+            for i, both_timestamp in enumerate(both_timestamps):
+                if i < len(both_buy_hold):
+                    diff = abs((direction_timestamp - both_timestamp).total_seconds())
+                    if closest_idx is None or diff < min_diff:
+                        closest_idx = i
+                        min_diff = diff
+            
+            if closest_idx is not None and closest_idx < len(both_buy_hold):
+                buy_hold.append(both_buy_hold[closest_idx])
+            elif len(buy_hold) > 0:
+                # Verwende den letzten verfügbaren Wert
+                buy_hold.append(buy_hold[-1])
+            else:
+                # Fallback: Starte bei 0
+                buy_hold.append(0.0)
+    
+    # Fallback: Wenn buy_hold immer noch leer ist, erstelle eine einfache Nulllinie
+    if not buy_hold:
+        buy_hold = [0.0] * len(direction_timestamps)
+    
+    # Stelle sicher, dass buy_hold und andere Listen die gleiche Länge haben
+    while len(buy_hold) < len(direction_timestamps):
+        buy_hold.append(buy_hold[-1] if buy_hold else 0.0)
+    while len(buy_hold) > len(direction_timestamps):
+        buy_hold.pop()
+    
+    # Berechne Drawdown basierend auf der realistischen Equity-Kurve
+    peak = np.maximum.accumulate([x/100 + 1 for x in pnl_performance])
+    drawdown = (np.array([x/100 + 1 for x in pnl_performance]) - peak) / peak * 100
+    
+    # Berechne Metriken mit einer Mock-Analyzer-Instanz
+    class MockAnalyzer:
+        def calculate_metrics(self, equity_curve, trades):
+            """Calculate various financial metrics from an equity curve and trades."""
+            # Initialize variables
+            max_equity = equity_curve[0]
+            max_drawdown = 0
+            max_drawdown_usd = 0
+            total_fees = 0
+            total_gross_profit = 0
+            total_net_profit = 0
+            total_trade_duration = 0
+            winning_trades = 0
+            total_profit = 0
+            total_loss = 0
+
+            # Calculate drawdown using the provided formula
+            for equity in equity_curve:
+                if equity > max_equity:
+                    max_equity = equity
+                current_drawdown = (max_equity - equity) / max_equity
+                current_drawdown_usd = max_equity - equity
+                if current_drawdown > max_drawdown:
+                    max_drawdown = current_drawdown
+                    max_drawdown_usd = current_drawdown_usd
+            max_drawdown_pct = max_drawdown * 100
+
+            # Calculate returns
+            if len(equity_curve) > 1:
+                returns = np.diff(equity_curve) / equity_curve[:-1]
+                if len(returns) > 1:
+                    returns_mean = np.mean(returns)
+                    returns_std = np.std(returns, ddof=1) if len(returns) > 1 else 0
+                    sharpe_ratio = returns_mean / returns_std if returns_std != 0 else 0
+                    downside_returns = returns[returns < 0]
+                    downside_std = np.std(downside_returns, ddof=1) if len(downside_returns) > 1 else 0
+                    sortino_ratio = returns_mean / downside_std if downside_std != 0 else 0
+                    volatility = returns_std
+                else:
+                    sharpe_ratio = 0
+                    sortino_ratio = 0
+                    volatility = 0
+            else:
+                sharpe_ratio = 0
+                sortino_ratio = 0
+                volatility = 0
+
+            # Calculate trade-related metrics
+            for trade in trades:
+                if len(trade) >= 9:
+                    entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, fees, trade_type, exit_reason = trade
+                else:
+                    entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, fees, trade_type = trade[:8]
+                    
+                if net_profit is not None:  # Only consider completed trades
+                    total_fees += fees
+                    total_gross_profit += gross_profit
+                    total_net_profit += net_profit
+                    total_trade_duration += (exit_time - entry_time).total_seconds()
+                    if net_profit > 0:
+                        winning_trades += 1
+                        total_profit += net_profit
+                    else:
+                        total_loss += abs(net_profit)
+
+            num_trades = sum(1 for trade in trades if len(trade) > 4 and trade[4] is not None)  # Count only completed trades
+            avg_trade_profit = total_net_profit / num_trades if num_trades > 0 else 0
+            avg_trade_profit_pct = (avg_trade_profit / equity_curve[0]) * 100 if equity_curve[0] != 0 else 0
+            avg_trade_duration = total_trade_duration / num_trades if num_trades > 0 else 0
+            profit_pct = (total_net_profit / equity_curve[0]) * 100 if equity_curve[0] != 0 else 0
+            win_rate = (winning_trades / num_trades) * 100 if num_trades > 0 else 0
+            profit_factor = total_profit / total_loss if total_loss != 0 else float('inf')
+
+            return {
+                'max_drawdown': max_drawdown,
+                'max_drawdown_usd': max_drawdown_usd,
+                'max_drawdown_pct': max_drawdown_pct,
+                'sharpe_ratio': sharpe_ratio,
+                'sortino_ratio': sortino_ratio,
+                'volatility': volatility,
+                'total_fees': total_fees,
+                'total_gross_profit': total_gross_profit,
+                'total_net_profit': total_net_profit,
+                'avg_trade_profit': avg_trade_profit,
+                'avg_trade_profit_pct': avg_trade_profit_pct,
+                'avg_trade_duration': avg_trade_duration,
+                'profit_pct': profit_pct,
+                'win_rate': win_rate,
+                'profit_factor': profit_factor
+            }
+    
+    mock_analyzer = MockAnalyzer()
+    metrics = mock_analyzer.calculate_metrics(direction_equity_curve, direction_trades)
+    
+    return {
+        'trades': direction_trades,
+        'metrics': metrics,
+        'equity_curve_timestamps': direction_timestamps,
+        'pnl_performance': pnl_performance,
+        'buy_hold': buy_hold,
+        'drawdown': drawdown,
+        'direction': target_direction
+    }
+
 def create_metrics_table(results_both, results_long, results_short):
     """Create side-by-side metrics table for available directions"""
     
@@ -276,7 +464,12 @@ def create_trade_list_table(trades, direction="Both"):
             exit_reason = "N/A"
             
         if net_profit is not None:
-            profit_pct = (net_profit / 10000) * 100  # Assuming initial equity for percentage calculation
+            # Korrekte Prozent-Berechnung: Preisveränderung des Assets
+            if trade_type == "LONG":
+                profit_pct = ((exit_price - entry_price) / entry_price) * 100
+            else:  # SHORT
+                profit_pct = ((entry_price - exit_price) / entry_price) * 100
+            
             row_style = "background-color: #e8f5e8;" if net_profit > 0 else "background-color: #ffe8e8;" if net_profit < 0 else ""
             
             trade_rows.append(f"""
@@ -341,11 +534,11 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
         print("Analyzing 'both' direction...")
         results_both = analyze_direction(timeframe_data, strategy_class, strategy_params, 'both')
         
-        print("Analyzing 'long' direction...")
-        results_long = analyze_direction(timeframe_data, strategy_class, strategy_params, 'long')
+        print("Calculating realistic 'long' metrics from 'both' analysis...")
+        results_long = calculate_realistic_direction_metrics(results_both, 'long')
         
-        print("Analyzing 'short' direction...")
-        results_short = analyze_direction(timeframe_data, strategy_class, strategy_params, 'short')
+        print("Calculating realistic 'short' metrics from 'both' analysis...")
+        results_short = calculate_realistic_direction_metrics(results_both, 'short')
         
     elif selected_direction == 'long':
         print("Analyzing 'long' direction only...")

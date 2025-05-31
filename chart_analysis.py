@@ -72,7 +72,12 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
             exit_reason = trade[8] if len(trade) > 8 else ''  # Get exit reason from tuple
             
             if net_profit is not None:
-                profit_pct = (net_profit / current_equity) * 100
+                # Korrekte Prozent-Berechnung: Preisveränderung des Assets
+                if trade_type == "LONG":
+                    profit_pct = ((exit_price - entry_price) / entry_price) * 100
+                else:  # SHORT
+                    profit_pct = ((entry_price - exit_price) / entry_price) * 100
+                
                 current_equity += net_profit
                 total_profit += net_profit
                 total_fees += fees

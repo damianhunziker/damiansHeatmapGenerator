@@ -165,7 +165,14 @@ class TradeAnalyzer:
                 entry_time, exit_time, entry_price, exit_price, net_profit, gross_profit, fees, trade_type = trade
                 exit_reason = "N/A"
             
-            profit_pct = (net_profit / current_equity) * 100 if net_profit is not None else 0
+            # Korrekte Prozent-Berechnung: Preisveränderung des Assets
+            if net_profit is not None:
+                if trade_type == "LONG":
+                    profit_pct = ((exit_price - entry_price) / entry_price) * 100
+                else:  # SHORT
+                    profit_pct = ((entry_price - exit_price) / entry_price) * 100
+            else:
+                profit_pct = 0
             
             # Format datetime objects or handle other types
             entry_time_str = entry_time.strftime('%Y-%m-%d %H:%M') if hasattr(entry_time, 'strftime') else str(entry_time)
