@@ -1,0 +1,2870 @@
+Initializing Chart Analysis...
+
+=== Debug: Strategy Initialization ===
+
+DEBUG: Trade direction parameter: both
+DEBUG: All kwargs: {'strategy': 'LiveKAMASSLStrategy', 'interval': '4h'}
+
+=== Debug: Strategy Initialization ===
+
+Strategy Initialization Parameters:
+Trade Direction: both
+Entry Filter: 0.7
+Exit Filter: 1.0
+Initial Equity: $10000
+Fee Percentage: 0.04%
+Use Divergence Exit Long: True
+Use Hidden Divergence Exit Long: False
+Use Divergence Exit Short: True
+Use Hidden Divergence Exit Short: False
+Divergence Order: 5
+RSI Length: 14
+Calculate Divergences: True
+Start Date: 2024-01-01
+End Date: 2024-03-01
+Asset: BTCUSDT
+
+Fusion Range Filter Parameters:
+Use Fusion for Long: True
+ATR Length: 9
+HMA Mode: VWMA
+HMA Length: 50
+ATR Scaling Factor: 1.4
+
+KAMA Parameters:
+Entry KAMA:
+  Length: 16
+  Fast Length: 4
+  Slow Length: 24
+
+KAMA2:
+  Length: 15
+  Fast Length: 3
+  Slow Length: 22
+
+Exit KAMA:
+  Length: 14
+  Fast Length: 2
+  Slow Length: 20
+
+Other Parameters:
+SSL Period: 89
+DEMA Length: 200
+Bollinger Band Length: 20
+Bollinger Band Standard Deviation: 2.0
+Momentum Length: 10
+RSI Length: 14
+Divergence Order: 5
+
+Selected Indicators: ['momentum', 'adp']
+
+Selected Indicators: ['momentum', 'adp']
+
+Short Divergence Detector Settings:
+Indicators: None
+Pivot Period: 11
+Pivot Limit: 1
+Lookback: 20
+Source: Close
+Don't Confirm: False
+Strategy class: LiveKAMASSLStrategy
+Strategy params: {'start_date': '2024-01-01', 'end_date': '2024-03-01', 'asset': 'BTCUSDT', 'strategy': 'LiveKAMASSLStrategy', 'interval': '4h', 'debug_mode': True, 'initial_equity': 10000}
+TradeAnalyzer - Init - start_date: 2024-01-01, end_date: 2024-03-01
+
+Data shape: (366, 5)
+Data columns: ['price_open', 'price_high', 'price_low', 'price_close', 'volume_traded']
+Date range: 2024-01-01 to 2024-03-01
+DivergenceDetector date range updated: 2024-01-01 to 2024-03-01
+
+=== Debug: Data Analysis ===
+
+Calculating signals...
+  0%|          | 0/100/Users/jgtcdghun/workspace/python/heatmap_generator/classes/strategies/live_kama_ssl_strategy.py:348: FutureWarning: DataFrame.fillna with 'method' is deprecated and will raise in a future version. Use obj.ffill() or obj.bfill() instead.
+  df = df.fillna(method='ffill')  # Forward fill for most columns
+TradeAnalyzer - analyze_data - start_date: 2024-01-01, end_date: 2024-03-01
+
+=== Starting data preparation ===
+Initial data shape: (366, 5)
+
+Calculating indicators for trade direction: both
+Initial data shape: (366, 5)
+
+Indicator calculation complete!
+Final data shape: (366, 28)
+
+Indicator Statistics:
+
+entry_kama:
+Min: 40717.77995731
+Max: 59729.10561865
+Mean: 45475.79950478
+NaN count: 0
+
+exit_kama:
+Min: 39664.02823551
+Max: 62048.74652063
+Mean: 46025.20848978
+NaN count: 0
+
+entry_kama_delta:
+Min: -282.32043681
+Max: 811.03771781
+Mean: 46.74881317
+NaN count: 0
+
+exit_kama_delta:
+Min: -609.75327858
+Max: 1235.94681947
+Mean: 52.25550323
+NaN count: 0
+
+entry_kama_delta_std:
+Min: 1.78367525
+Max: 235.75218218
+Mean: 45.23654879
+NaN count: 0
+
+exit_kama_delta_std:
+Min: 4.89932869
+Max: 435.19314158
+Mean: 92.27164423
+NaN count: 0
+
+entry_kama_delta_limit:
+Min: 1.24857268
+Max: 165.02652753
+Mean: 31.66558415
+NaN count: 0
+
+exit_kama_delta_limit:
+Min: -435.19314158
+Max: -4.89932869
+Mean: -92.27164423
+NaN count: 0
+
+ssl_down:
+Min: 0.00000000
+Max: 57146.03000000
+Mean: 35046.05540984
+NaN count: 0
+
+ssl_up:
+Min: 0.00000000
+Max: 58440.46000000
+Mean: 35100.20325137
+NaN count: 0
+
+ssl_signal:
+Min: -1.00000000
+Max: 1.00000000
+Mean: 0.07650273
+NaN count: 0
+
+bb_basis:
+Min: 0.00000000
+Max: 60223.48250000
+Mean: 43561.34388251
+NaN count: 0
+
+bb_upper:
+Min: 0.00000000
+Max: 65062.44428140
+Mean: 45113.51632255
+NaN count: 0
+
+bb_lower:
+Min: 0.00000000
+Max: 55699.44359980
+Mean: 42009.17144248
+NaN count: 0
+
+=== Calculating Divergences ===
+Long Profile (Regular) Divergence Settings:
+Indicators: ['momentum', 'adp']
+Pivot Period: 10
+
+Short Profile Divergence Settings:
+Indicators: ['adp', 'stoch', 'cci', 'diosc', 'cmf']
+Pivot Period: 11
+
+Calculating Long Profile Divergences...
+
+Processing indicator: momentum
+
+Finding pivot points...
+
+Finding high pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding high pivots (short): 100%|██████████| 339/339 [00:00<00:00, 21737.79it/s]
+
+Finding low pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding low pivots (short): 100%|██████████| 339/339 [00:00<00:00, 27327.87it/s]
+Found 7 short period high pivots and 13 short period low pivots
+
+Finding high pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding high pivots (long): 100%|██████████| 341/341 [00:00<00:00, 22390.11it/s]
+
+Finding low pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding low pivots (long): 100%|██████████| 341/341 [00:00<00:00, 27709.58it/s]
+Found 8 long period high pivots and 13 long period low pivots
+
+Processing all possible divergences...
+
+Processing long period high pivots...
+Virtual line intersection at index 48: price 46979.35 > line 46366.57
+
+Bearish divergence rejected due to virtual line intersection
+Virtual line intersection at index 276: price 52002.01 > line 51939.29
+
+Bearish divergence rejected due to virtual line intersection
+
+Processing short period low pivots...
+Virtual line intersection at index 74: price 42609.94 < line 42766.06
+
+Bullish divergence rejected due to virtual line intersection
+
+Found total of 0 divergences
+Bearish (long exits): 0, Bullish (short exits): 0
+Found 0 bearish divergences for momentum
+
+Processing indicator: adp
+
+Finding pivot points...
+
+Finding high pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding high pivots (short): 100%|██████████| 339/339 [00:00<00:00, 21978.72it/s]
+
+Finding low pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding low pivots (short): 100%|██████████| 339/339 [00:00<00:00, 27296.92it/s]
+Found 7 short period high pivots and 13 short period low pivots
+
+Finding high pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding high pivots (long): 100%|██████████| 341/341 [00:00<00:00, 22708.99it/s]
+
+Finding low pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding low pivots (long): 100%|██████████| 341/341 [00:00<00:00, 28301.20it/s]
+Found 8 long period high pivots and 13 long period low pivots
+
+Processing all possible divergences...
+
+Processing long period high pivots...
+Virtual line intersection at index 48: price 46979.35 > line 46366.57
+
+Bearish divergence rejected due to virtual line intersection
+Virtual line intersection at index 276: price 52002.01 > line 51939.29
+
+Bearish divergence rejected due to virtual line intersection
+
+Processing short period low pivots...
+Virtual line intersection at index 74: price 42609.94 < line 42766.06
+
+Bullish divergence rejected due to virtual line intersection
+Virtual line intersection at index 89: price 42278.99 < line 42485.45
+
+Bullish divergence rejected due to virtual line intersection
+Virtual line intersection at index 310: price 50965.53 < line 51148.86
+
+Bullish divergence rejected due to virtual line intersection
+
+Found total of 0 divergences
+Bearish (long exits): 0, Bullish (short exits): 0
+Found 0 bearish divergences for adp
+
+Calculating Short Profile Divergences...
+
+Processing short indicator: adp
+
+Finding pivot points...
+
+Finding high pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding high pivots (short): 100%|██████████| 339/339 [00:00<00:00, 21382.45it/s]
+
+Finding low pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding low pivots (short): 100%|██████████| 339/339 [00:00<00:00, 25716.57it/s]
+Found 7 short period high pivots and 13 short period low pivots
+
+Finding high pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding high pivots (long): 100%|██████████| 341/341 [00:00<00:00, 22620.28it/s]
+
+Finding low pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding low pivots (long): 100%|██████████| 341/341 [00:00<00:00, 27460.07it/s]
+Found 8 long period high pivots and 13 long period low pivots
+
+Processing all possible divergences...
+
+Processing long period high pivots...
+Virtual line intersection at index 48: price 46979.35 > line 46366.57
+
+Bearish divergence rejected due to virtual line intersection
+Virtual line intersection at index 276: price 52002.01 > line 51939.29
+
+Bearish divergence rejected due to virtual line intersection
+
+Processing short period low pivots...
+Virtual line intersection at index 74: price 42609.94 < line 42766.06
+
+Bullish divergence rejected due to virtual line intersection
+Virtual line intersection at index 89: price 42278.99 < line 42485.45
+
+Bullish divergence rejected due to virtual line intersection
+Virtual line intersection at index 310: price 50965.53 < line 51148.86
+
+Bullish divergence rejected due to virtual line intersection
+
+Found total of 0 divergences
+Bearish (long exits): 0, Bullish (short exits): 0
+Found 0 bullish divergences for adp
+
+Processing short indicator: stoch
+
+Finding pivot points...
+
+Finding high pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding high pivots (short): 100%|██████████| 339/339 [00:00<00:00, 21811.82it/s]
+
+Finding low pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding low pivots (short): 100%|██████████| 339/339 [00:00<00:00, 26678.72it/s]
+Found 7 short period high pivots and 13 short period low pivots
+
+Finding high pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding high pivots (long): 100%|██████████| 341/341 [00:00<00:00, 22608.48it/s]
+
+Finding low pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding low pivots (long): 100%|██████████| 341/341 [00:00<00:00, 28068.48it/s]
+Found 8 long period high pivots and 13 long period low pivots
+
+Processing all possible divergences...
+
+Processing long period high pivots...
+Virtual line intersection at index 276: price 52002.01 > line 51939.29
+
+Bearish divergence rejected due to virtual line intersection
+
+Processing short period low pivots...
+Virtual line intersection at index 74: price 42609.94 < line 42766.06
+
+Bullish divergence rejected due to virtual line intersection
+Virtual line intersection at index 89: price 42278.99 < line 42485.45
+
+Bullish divergence rejected due to virtual line intersection
+
+Found total of 0 divergences
+Bearish (long exits): 0, Bullish (short exits): 0
+Found 0 bullish divergences for stoch
+
+Processing short indicator: cci
+
+Finding pivot points...
+
+Finding high pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding high pivots (short): 100%|██████████| 339/339 [00:00<00:00, 21337.21it/s]
+
+Finding low pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding low pivots (short): 100%|██████████| 339/339 [00:00<00:00, 26201.36it/s]
+Found 7 short period high pivots and 13 short period low pivots
+
+Finding high pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding high pivots (long): 100%|██████████| 341/341 [00:00<00:00, 22646.78it/s]
+
+Finding low pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding low pivots (long): 100%|██████████| 341/341 [00:00<00:00, 27825.48it/s]
+Found 8 long period high pivots and 13 long period low pivots
+
+Processing all possible divergences...
+
+Processing long period high pivots...
+Virtual line intersection at index 276: price 52002.01 > line 51939.29
+
+Bearish divergence rejected due to virtual line intersection
+
+Processing short period low pivots...
+Virtual line intersection at index 74: price 42609.94 < line 42766.06
+
+Bullish divergence rejected due to virtual line intersection
+Virtual line intersection at index 312: price 51058.00 < line 51126.58
+
+Bullish divergence rejected due to virtual line intersection
+
+Found total of 0 divergences
+Bearish (long exits): 0, Bullish (short exits): 0
+Found 0 bullish divergences for cci
+
+Processing short indicator: diosc
+
+Finding pivot points...
+
+Finding high pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding high pivots (short): 100%|██████████| 339/339 [00:00<00:00, 22279.36it/s]
+
+Finding low pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding low pivots (short): 100%|██████████| 339/339 [00:00<00:00, 27336.80it/s]
+Found 7 short period high pivots and 13 short period low pivots
+
+Finding high pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding high pivots (long): 100%|██████████| 341/341 [00:00<00:00, 22209.31it/s]
+
+Finding low pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding low pivots (long): 100%|██████████| 341/341 [00:00<00:00, 27491.21it/s]
+Found 8 long period high pivots and 13 long period low pivots
+
+Processing all possible divergences...
+
+Processing long period high pivots...
+Virtual line intersection at index 276: price 52002.01 > line 51939.29
+
+Bearish divergence rejected due to virtual line intersection
+
+Processing short period low pivots...
+Virtual line intersection at index 89: price 42278.99 < line 42485.45
+
+Bullish divergence rejected due to virtual line intersection
+
+Found total of 0 divergences
+Bearish (long exits): 0, Bullish (short exits): 0
+Found 0 bullish divergences for diosc
+
+Processing short indicator: cmf
+
+Finding pivot points...
+
+Finding high pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding high pivots (short): 100%|██████████| 339/339 [00:00<00:00, 22057.13it/s]
+
+Finding low pivots (short):   0%|          | 0/339 [00:00<?, ?it/s][AFinding low pivots (short): 100%|██████████| 339/339 [00:00<00:00, 27264.46it/s]
+Found 7 short period high pivots and 13 short period low pivots
+
+Finding high pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding high pivots (long): 100%|██████████| 341/341 [00:00<00:00, 22718.01it/s]
+
+Finding low pivots (long):   0%|          | 0/341 [00:00<?, ?it/s][AFinding low pivots (long): 100%|██████████| 341/341 [00:00<00:00, 28231.37it/s]
+Found 8 long period high pivots and 13 long period low pivots
+
+Processing all possible divergences...
+
+Processing long period high pivots...
+Virtual line intersection at index 276: price 52002.01 > line 51939.29
+
+Bearish divergence rejected due to virtual line intersection
+
+Processing short period low pivots...
+Virtual line intersection at index 89: price 42278.99 < line 42485.45
+
+Bullish divergence rejected due to virtual line intersection
+Virtual line intersection at index 312: price 51058.00 < line 51126.58
+
+Bullish divergence rejected due to virtual line intersection
+
+Found total of 0 divergences
+Bearish (long exits): 0, Bullish (short exits): 0
+Found 0 bullish divergences for cmf
+
+=== Divergence Calculation Summary ===
+
+Long Profile Divergences:
+momentum: 0 bearish divergences
+adp: 0 bearish divergences
+
+Short Profile Divergences:
+adp: 0 bullish divergences
+stoch: 0 bullish divergences
+cci: 0 bullish divergences
+diosc: 0 bullish divergences
+cmf: 0 bullish divergences
+
+=== Debug: Signal Preparation ===
+Data shape: (366, 28)
+Columns: ['price_open', 'price_high', 'price_low', 'price_close', 'volume_traded', 'entry_kama', 'kama2', 'exit_kama', 'entry_kama_delta', 'exit_kama_delta', 'entry_kama_delta_std', 'exit_kama_delta_std', 'entry_kama_delta_limit', 'exit_kama_delta_limit', 'ssl_down', 'ssl_up', 'ssl_signal', 'dema', 'bb_basis', 'bb_upper', 'bb_lower', 'momentum', 'rsi', 'adp', 'stoch', 'cci', 'diosc', 'cmf']
+
+Fusion condition at 2024-01-01 04:00:00: False
+Fusion MA: nan
+Fusion ATR: nan
+
+Trend condition met at 2024-01-01 04:00:00
+Exit KAMA: 42615.99727891
+KAMA2: 42616.50344045
+
+Fusion condition at 2024-01-01 08:00:00: False
+Fusion MA: nan
+Fusion ATR: nan
+
+Trend condition met at 2024-01-01 08:00:00
+Exit KAMA: 42613.40764373
+KAMA2: 42614.34076794
+
+Fusion condition at 2024-01-01 12:00:00: False
+Fusion MA: nan
+Fusion ATR: nan
+
+Trend condition met at 2024-01-01 12:00:00
+Exit KAMA: 42612.31061295
+KAMA2: 42613.41917423
+
+Fusion condition at 2024-01-01 16:00:00: False
+Fusion MA: nan
+Fusion ATR: nan
+
+Trend condition met at 2024-01-01 16:00:00
+Exit KAMA: 42613.01709265
+KAMA2: 42613.99974758
+
+Fusion condition at 2024-01-01 20:00:00: False
+Fusion MA: nan
+Fusion ATR: nan
+
+Trend condition met at 2024-01-01 20:00:00
+Exit KAMA: 42614.55934124
+KAMA2: 42615.27801036
+
+Trend condition met at 2024-01-02 00:00:00
+Exit KAMA: 42622.75372363
+KAMA2: 42622.10380990
+
+Fusion condition at 2024-01-02 00:00:00: False
+Fusion MA: nan
+Fusion ATR: nan
+
+Trend condition met at 2024-01-02 04:00:00
+Exit KAMA: 42636.87432478
+KAMA2: 42633.88034064
+
+Fusion condition at 2024-01-02 04:00:00: False
+Fusion MA: nan
+Fusion ATR: nan
+
+Trend condition met at 2024-01-02 08:00:00
+Exit KAMA: 42661.95827648
+KAMA2: 42654.81417549
+
+Fusion condition at 2024-01-02 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 1180.25714225
+
+Trend condition met at 2024-01-02 12:00:00
+Exit KAMA: 42687.29679552
+KAMA2: 42675.99161084
+
+Fusion condition at 2024-01-02 12:00:00: False
+Fusion MA: nan
+Fusion ATR: 1156.27837284
+
+Trend condition met at 2024-01-02 16:00:00
+Exit KAMA: 42712.21011256
+KAMA2: 42696.84604100
+
+Fusion condition at 2024-01-02 16:00:00: False
+Fusion MA: nan
+Fusion ATR: 1148.09734693
+
+Trend condition met at 2024-01-02 20:00:00
+Exit KAMA: 42734.63741313
+KAMA2: 42715.65869854
+
+Fusion condition at 2024-01-02 20:00:00: False
+Fusion MA: nan
+Fusion ATR: 1206.97389391
+
+Trend condition met at 2024-01-03 00:00:00
+Exit KAMA: 42755.54310553
+KAMA2: 42733.23020176
+
+Fusion condition at 2024-01-03 00:00:00: False
+Fusion MA: nan
+Fusion ATR: 1189.28291142
+
+Trend condition met at 2024-01-03 04:00:00
+Exit KAMA: 42775.41944924
+KAMA2: 42749.96880137
+
+Fusion condition at 2024-01-03 04:00:00: False
+Fusion MA: nan
+Fusion ATR: 1199.06976143
+
+Trend condition met at 2024-01-03 08:00:00
+Exit KAMA: 43265.69231845
+KAMA2: 42768.96858359
+
+Fusion condition at 2024-01-03 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 1203.52627554
+
+Trend condition met at 2024-01-03 12:00:00
+Exit KAMA: 43638.84907354
+KAMA2: 42974.35409798
+
+Fusion condition at 2024-01-03 12:00:00: False
+Fusion MA: nan
+Fusion ATR: 1168.36948022
+
+Trend condition met at 2024-01-03 16:00:00
+Exit KAMA: 43642.46339360
+KAMA2: 43001.34125607
+
+Fusion condition at 2024-01-03 16:00:00: False
+Fusion MA: nan
+Fusion ATR: 1416.01540561
+
+Trend condition met at 2024-01-03 20:00:00
+Exit KAMA: 43629.29359521
+KAMA2: 43001.31824515
+
+Fusion condition at 2024-01-03 20:00:00: False
+Fusion MA: nan
+Fusion ATR: 2253.51733073
+
+Trend condition met at 2024-01-04 00:00:00
+Exit KAMA: 43618.17160916
+KAMA2: 42997.77114657
+
+Fusion condition at 2024-01-04 00:00:00: False
+Fusion MA: nan
+Fusion ATR: 2356.27289291
+
+Trend condition met at 2024-01-04 04:00:00
+Exit KAMA: 43610.32115053
+KAMA2: 42996.34175811
+
+Fusion condition at 2024-01-04 04:00:00: False
+Fusion MA: nan
+Fusion ATR: 2387.61385131
+
+Trend condition met at 2024-01-04 08:00:00
+Exit KAMA: 43601.04151710
+KAMA2: 42997.55513922
+
+Fusion condition at 2024-01-04 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 2438.52831620
+
+Trend condition met at 2024-01-04 12:00:00
+Exit KAMA: 43552.99174286
+KAMA2: 42993.17629139
+
+Fusion condition at 2024-01-04 12:00:00: False
+Fusion MA: nan
+Fusion ATR: 2500.45012817
+
+Trend condition met at 2024-01-04 16:00:00
+Exit KAMA: 43504.14837826
+KAMA2: 42997.61770773
+
+Fusion condition at 2024-01-04 16:00:00: False
+Fusion MA: nan
+Fusion ATR: 2491.43331431
+
+Trend condition met at 2024-01-04 20:00:00
+Exit KAMA: 43535.11125730
+KAMA2: 43033.77629428
+
+Fusion condition at 2024-01-04 20:00:00: False
+Fusion MA: nan
+Fusion ATR: 2484.89613921
+
+Trend condition met at 2024-01-05 00:00:00
+Exit KAMA: 43560.08033903
+KAMA2: 43068.94281068
+
+Fusion condition at 2024-01-05 00:00:00: False
+Fusion MA: nan
+Fusion ATR: 2431.15233528
+
+Trend condition met at 2024-01-05 04:00:00
+Exit KAMA: 43583.70204898
+KAMA2: 43102.80372967
+
+Fusion condition at 2024-01-05 04:00:00: False
+Fusion MA: nan
+Fusion ATR: 2274.89108956
+
+Trend condition met at 2024-01-05 08:00:00
+Exit KAMA: 43576.83572243
+KAMA2: 43117.18235514
+
+Fusion condition at 2024-01-05 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 1511.63058089
+
+Trend condition met at 2024-01-05 12:00:00
+Exit KAMA: 43584.82922292
+KAMA2: 43135.64248765
+
+Fusion condition at 2024-01-05 12:00:00: False
+Fusion MA: nan
+Fusion ATR: 1315.22225115
+
+Trend condition met at 2024-01-05 16:00:00
+Exit KAMA: 43595.13753136
+KAMA2: 43152.47368020
+
+Fusion condition at 2024-01-05 16:00:00: False
+Fusion MA: nan
+Fusion ATR: 1367.54015709
+
+Trend condition met at 2024-01-05 20:00:00
+Exit KAMA: 43589.81526679
+KAMA2: 43166.56296833
+
+Fusion condition at 2024-01-05 20:00:00: False
+Fusion MA: nan
+Fusion ATR: 1410.91858757
+
+Trend condition met at 2024-01-06 00:00:00
+Exit KAMA: 43589.93235994
+KAMA2: 43180.73135591
+
+Fusion condition at 2024-01-06 00:00:00: False
+Fusion MA: nan
+Fusion ATR: 1418.72882364
+
+Trend condition met at 2024-01-06 04:00:00
+Exit KAMA: 43620.09229696
+KAMA2: 43194.72786188
+
+Fusion condition at 2024-01-06 04:00:00: False
+Fusion MA: nan
+Fusion ATR: 1437.51329222
+
+Trend condition met at 2024-01-06 08:00:00
+Exit KAMA: 43641.52912390
+KAMA2: 43214.64813699
+
+Fusion condition at 2024-01-06 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 1350.60874438
+
+Trend condition met at 2024-01-06 12:00:00
+Exit KAMA: 43641.97695895
+KAMA2: 43228.41858667
+
+Fusion condition at 2024-01-06 12:00:00: False
+Fusion MA: nan
+Fusion ATR: 1376.75109205
+
+Trend condition met at 2024-01-06 16:00:00
+Exit KAMA: 43642.84380320
+KAMA2: 43239.92915815
+
+Fusion condition at 2024-01-06 16:00:00: False
+Fusion MA: nan
+Fusion ATR: 1364.28064450
+
+Trend condition met at 2024-01-06 20:00:00
+Exit KAMA: 43656.34383374
+KAMA2: 43255.28056807
+
+Fusion condition at 2024-01-06 20:00:00: False
+Fusion MA: nan
+Fusion ATR: 1031.55475765
+
+Trend condition met at 2024-01-07 00:00:00
+Exit KAMA: 43666.76527655
+KAMA2: 43280.87008515
+
+Fusion condition at 2024-01-07 00:00:00: False
+Fusion MA: nan
+Fusion ATR: 994.32384058
+
+Trend condition met at 2024-01-07 04:00:00
+Exit KAMA: 43670.47517604
+KAMA2: 43300.97503349
+
+Fusion condition at 2024-01-07 04:00:00: False
+Fusion MA: nan
+Fusion ATR: 924.18295354
+
+Trend condition met at 2024-01-07 08:00:00
+Exit KAMA: 43673.08621485
+KAMA2: 43307.62403308
+
+Fusion condition at 2024-01-07 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 754.35891890
+
+Trend condition met at 2024-01-07 12:00:00
+Exit KAMA: 43677.94482535
+KAMA2: 43315.89285250
+
+Fusion condition at 2024-01-07 12:00:00: False
+Fusion MA: nan
+Fusion ATR: 665.92264530
+
+Trend condition met at 2024-01-07 16:00:00
+Exit KAMA: 43701.52036888
+KAMA2: 43323.30219769
+
+Fusion condition at 2024-01-07 16:00:00: False
+Fusion MA: nan
+Fusion ATR: 527.41111803
+
+Trend condition met at 2024-01-07 20:00:00
+Exit KAMA: 43712.14581785
+KAMA2: 43350.63249924
+
+Fusion condition at 2024-01-07 20:00:00: False
+Fusion MA: nan
+Fusion ATR: 568.73276035
+
+Trend condition met at 2024-01-08 00:00:00
+Exit KAMA: 43738.58798717
+KAMA2: 43378.87130873
+
+Fusion condition at 2024-01-08 00:00:00: False
+Fusion MA: nan
+Fusion ATR: 561.40415670
+
+Trend condition met at 2024-01-08 04:00:00
+Exit KAMA: 43746.86412650
+KAMA2: 43385.98204792
+
+Fusion condition at 2024-01-08 04:00:00: False
+Fusion MA: nan
+Fusion ATR: 644.22473352
+
+Trend condition met at 2024-01-08 08:00:00
+Exit KAMA: 43743.88626850
+KAMA2: 43387.05000134
+
+Fusion condition at 2024-01-08 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 752.22798211
+
+Trend condition met at 2024-01-08 12:00:00
+Exit KAMA: 43748.15685570
+KAMA2: 43398.51858938
+
+Fusion condition at 2024-01-08 12:00:00: False
+Fusion MA: nan
+Fusion ATR: 868.46050163
+
+Trend condition met at 2024-01-08 16:00:00
+Exit KAMA: 43798.16948714
+KAMA2: 43427.66319860
+
+Fusion condition at 2024-01-08 16:00:00: False
+Fusion MA: nan
+Fusion ATR: 977.44015463
+
+Trend condition met at 2024-01-08 20:00:00
+Exit KAMA: 43944.80455442
+KAMA2: 43503.17926866
+
+Fusion condition at 2024-01-08 20:00:00: False
+Fusion MA: nan
+Fusion ATR: 1118.09704597
+
+Trend condition met at 2024-01-09 00:00:00
+Exit KAMA: 44651.04402338
+KAMA2: 43972.23555737
+
+Fusion condition at 2024-01-09 00:00:00: False
+Fusion MA: nan
+Fusion ATR: 1848.36551703
+
+Trend condition met at 2024-01-09 04:00:00
+Exit KAMA: 45157.03670403
+KAMA2: 44364.38043081
+
+Fusion condition at 2024-01-09 04:00:00: False
+Fusion MA: nan
+Fusion ATR: 1775.60546714
+
+Trend condition met at 2024-01-09 08:00:00
+Exit KAMA: 45535.71100989
+KAMA2: 44684.92714998
+
+Fusion condition at 2024-01-09 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 1788.78945809
+
+Trend condition met at 2024-01-09 12:00:00
+Exit KAMA: 45785.16710321
+KAMA2: 44929.64592880
+
+Fusion condition at 2024-01-09 12:00:00: False
+Fusion MA: nan
+Fusion ATR: 1760.83421462
+
+Trend condition met at 2024-01-09 16:00:00
+Exit KAMA: 45922.09757627
+KAMA2: 45089.58427408
+
+Fusion condition at 2024-01-09 16:00:00: False
+Fusion MA: nan
+Fusion ATR: 1731.36894066
+
+Trend condition met at 2024-01-09 20:00:00
+Exit KAMA: 46082.51799955
+KAMA2: 45272.55479893
+
+Fusion condition at 2024-01-09 20:00:00: False
+Fusion MA: nan
+Fusion ATR: 1853.45267656
+
+Trend condition met at 2024-01-10 00:00:00
+Exit KAMA: 46219.53543506
+KAMA2: 45432.73524110
+
+Fusion condition at 2024-01-10 00:00:00: False
+Fusion MA: nan
+Fusion ATR: 1808.93902331
+
+Trend condition met at 2024-01-10 04:00:00
+Exit KAMA: 46209.72075866
+KAMA2: 45469.55828056
+
+Fusion condition at 2024-01-10 04:00:00: False
+Fusion MA: nan
+Fusion ATR: 2405.42343339
+
+Trend condition met at 2024-01-10 08:00:00
+Exit KAMA: 46202.10058690
+KAMA2: 45505.26119566
+
+Fusion condition at 2024-01-10 08:00:00: False
+Fusion MA: nan
+Fusion ATR: 2468.99868397
+
+Trend condition met at 2024-01-10 12:00:00
+Exit KAMA: 46167.04435443
+KAMA2: 45514.58907494
+
+Fusion condition at 2024-01-10 12:00:00: False
+Fusion MA: 1193.29585565
+Fusion ATR: 2120.29025278
+
+Trend condition met at 2024-01-10 16:00:00
+Exit KAMA: 46106.72669524
+KAMA2: 45514.64039794
+
+Fusion condition at 2024-01-10 16:00:00: False
+Fusion MA: 1214.42743618
+Fusion ATR: 2184.53566051
+
+Trend condition met at 2024-01-10 20:00:00
+Exit KAMA: 46064.75170914
+KAMA2: 45516.46315863
+
+Fusion condition at 2024-01-10 20:00:00: False
+Fusion MA: 1236.94289568
+Fusion ATR: 2227.60102047
+
+Trend condition met at 2024-01-11 00:00:00
+Exit KAMA: 46101.56333756
+KAMA2: 45582.60705942
+
+Fusion condition at 2024-01-11 00:00:00: False
+Fusion MA: 1261.97123609
+Fusion ATR: 2279.95542291
+
+Trend condition met at 2024-01-11 04:00:00
+Exit KAMA: 46145.73912552
+KAMA2: 45643.84770349
+
+Fusion condition at 2024-01-11 04:00:00: False
+Fusion MA: 1327.90777643
+Fusion ATR: 2793.01221255
+
+Trend condition met at 2024-01-11 08:00:00
+Exit KAMA: 46157.05472687
+KAMA2: 45680.55990541
+
+Fusion condition at 2024-01-11 08:00:00: False
+Fusion MA: 1348.65176870
+Fusion ATR: 2736.62642431
+
+Trend condition met at 2024-01-11 12:00:00
+Exit KAMA: 46154.16441804
+KAMA2: 45695.00578290
+
+Fusion condition at 2024-01-11 12:00:00: False
+Fusion MA: 1365.83222432
+Fusion ATR: 2766.12894101
+
+Trend condition met at 2024-01-11 16:00:00
+Exit KAMA: 46165.48347987
+KAMA2: 45707.76987711
+
+Fusion condition at 2024-01-11 16:00:00: False
+Fusion MA: 1375.66666525
+Fusion ATR: 2275.96064654
+
+Trend condition met at 2024-01-11 20:00:00
+Exit KAMA: 46171.69589330
+KAMA2: 45718.33676827
+
+Fusion condition at 2024-01-11 20:00:00: False
+Fusion MA: 1418.48816459
+Fusion ATR: 2656.30717820
+
+Trend condition met at 2024-01-12 00:00:00
+Exit KAMA: 46177.39332061
+KAMA2: 45727.74344276
+
+Fusion condition at 2024-01-12 00:00:00: False
+Fusion MA: 1446.51513128
+Fusion ATR: 2631.44464036
+
+Trend condition met at 2024-01-12 04:00:00
+Exit KAMA: 46181.47456534
+KAMA2: 45735.11533102
+
+Fusion condition at 2024-01-12 04:00:00: False
+Fusion MA: 1441.67772538
+Fusion ATR: 2637.54601456
+
+Trend condition met at 2024-01-12 08:00:00
+Exit KAMA: 46174.39952066
+KAMA2: 45741.56034099
+
+Fusion condition at 2024-01-12 08:00:00: False
+Fusion MA: 1438.23513836
+Fusion ATR: 2660.07105104
+
+Trend condition met at 2024-01-12 12:00:00
+Exit KAMA: 46172.43745413
+KAMA2: 45748.14824411
+
+Fusion condition at 2024-01-12 12:00:00: False
+Fusion MA: 1440.41217569
+Fusion ATR: 2659.07803904
+
+Trend condition met at 2024-01-12 16:00:00
+Exit KAMA: 46169.48010588
+KAMA2: 45750.27659740
+
+Fusion condition at 2024-01-12 16:00:00: False
+Fusion MA: 1437.68058248
+Fusion ATR: 2090.33207244
+
+Trend condition met at 2024-01-12 20:00:00
+Exit KAMA: 46079.58548082
+KAMA2: 45697.04131809
+
+Fusion condition at 2024-01-12 20:00:00: False
+Fusion MA: 1440.35185984
+Fusion ATR: 2245.25067988
+
+Trend condition met at 2024-01-13 00:00:00
+Exit KAMA: 45872.84120621
+KAMA2: 45577.28593483
+
+Fusion condition at 2024-01-13 00:00:00: False
+Fusion MA: 1445.03200049
+Fusion ATR: 2262.85842887
+
+Trend condition met at 2024-01-13 04:00:00
+Exit KAMA: 45549.84193377
+KAMA2: 45403.63801981
+
+Fusion condition at 2024-01-13 04:00:00: False
+Fusion MA: 1452.12057399
+Fusion ATR: 2486.64541301
+
+Fusion condition at 2024-01-13 08:00:00: False
+Fusion MA: 1447.14224502
+Fusion ATR: 2048.60374298
+
+Trend condition met at 2024-01-13 08:00:00
+Exit KAMA: 44940.08865519
+KAMA2: 45217.89101503
+
+Fusion condition at 2024-01-13 12:00:00: False
+Fusion MA: 1443.65892662
+Fusion ATR: 1999.59259765
+
+Trend condition met at 2024-01-13 12:00:00
+Exit KAMA: 44633.89859988
+KAMA2: 45030.88320141
+
+Fusion condition at 2024-01-13 16:00:00: False
+Fusion MA: 1451.80317800
+Fusion ATR: 1993.34649876
+
+Trend condition met at 2024-01-13 16:00:00
+Exit KAMA: 44278.22904436
+KAMA2: 44774.99260481
+
+Fusion condition at 2024-01-13 20:00:00: False
+Fusion MA: 1456.49036460
+Fusion ATR: 1996.67993753
+
+Trend condition met at 2024-01-13 20:00:00
+Exit KAMA: 44149.92372524
+KAMA2: 44652.14420500
+
+Fusion condition at 2024-01-14 00:00:00: False
+Fusion MA: 1462.98575162
+Fusion ATR: 2004.29505653
+
+Trend condition met at 2024-01-14 00:00:00
+Exit KAMA: 43835.89167163
+KAMA2: 44511.71954095
+
+Fusion condition at 2024-01-14 04:00:00: False
+Fusion MA: 1472.10293544
+Fusion ATR: 2030.67997985
+
+Trend condition met at 2024-01-14 04:00:00
+Exit KAMA: 43625.16989239
+KAMA2: 44298.09644067
+
+Fusion condition at 2024-01-14 08:00:00: False
+Fusion MA: 1478.31010858
+Fusion ATR: 1878.06872995
+
+Trend condition met at 2024-01-14 08:00:00
+Exit KAMA: 43421.79860283
+KAMA2: 44093.42257924
+
+Fusion condition at 2024-01-14 12:00:00: False
+Fusion MA: 1483.21960783
+Fusion ATR: 1752.29925227
+
+Trend condition met at 2024-01-14 12:00:00
+Exit KAMA: 43355.27087231
+KAMA2: 43982.99910623
+
+Fusion condition at 2024-01-14 16:00:00: True
+Fusion MA: 1481.15856479
+Fusion ATR: 801.65622475
+
+Trend condition met at 2024-01-14 16:00:00
+Exit KAMA: 43273.12083047
+KAMA2: 43868.88582709
+
+Fusion condition at 2024-01-14 20:00:00: True
+Fusion MA: 1478.54604464
+Fusion ATR: 769.12325487
+
+Trend condition met at 2024-01-14 20:00:00
+Exit KAMA: 43217.94116424
+KAMA2: 43784.21948686
+
+Fusion condition at 2024-01-15 00:00:00: True
+Fusion MA: 1473.06822358
+Fusion ATR: 706.73827618
+
+Trend condition met at 2024-01-15 00:00:00
+Exit KAMA: 43130.73948781
+KAMA2: 43679.26465687
+
+Fusion condition at 2024-01-15 04:00:00: True
+Fusion MA: 1456.48742391
+Fusion ATR: 860.04435961
+
+Trend condition met at 2024-01-15 04:00:00
+Exit KAMA: 42940.85308175
+KAMA2: 43468.34525942
+
+Fusion condition at 2024-01-15 08:00:00: True
+Fusion MA: 1451.39909986
+Fusion ATR: 892.78889192
+
+Trend condition met at 2024-01-15 08:00:00
+Exit KAMA: 42927.52799169
+KAMA2: 43429.80372435
+
+Fusion condition at 2024-01-15 12:00:00: True
+Fusion MA: 1448.01716051
+Fusion ATR: 871.45868417
+
+Trend condition met at 2024-01-15 12:00:00
+Exit KAMA: 42925.27155072
+KAMA2: 43415.41514884
+
+Fusion condition at 2024-01-15 16:00:00: True
+Fusion MA: 1447.77452990
+Fusion ATR: 847.99637095
+
+Trend condition met at 2024-01-15 16:00:00
+Exit KAMA: 42922.73701457
+KAMA2: 43409.08708464
+
+Fusion condition at 2024-01-15 20:00:00: True
+Fusion MA: 1438.98642146
+Fusion ATR: 924.28672268
+
+Trend condition met at 2024-01-15 20:00:00
+Exit KAMA: 42898.58018484
+KAMA2: 43394.68906640
+
+Fusion condition at 2024-01-16 00:00:00: True
+Fusion MA: 1429.40338549
+Fusion ATR: 1084.15769288
+
+Trend condition met at 2024-01-16 00:00:00
+Exit KAMA: 42900.35228034
+KAMA2: 43391.04191565
+
+Fusion condition at 2024-01-16 04:00:00: True
+Fusion MA: 1434.68569727
+Fusion ATR: 1114.60586460
+
+Trend condition met at 2024-01-16 04:00:00
+Exit KAMA: 42889.20136791
+KAMA2: 43383.02688942
+
+Fusion condition at 2024-01-16 08:00:00: True
+Fusion MA: 1436.94863938
+Fusion ATR: 1126.67418844
+
+Trend condition met at 2024-01-16 08:00:00
+Exit KAMA: 42889.63706926
+KAMA2: 43378.01010301
+
+Fusion condition at 2024-01-16 12:00:00: True
+Fusion MA: 1441.33906871
+Fusion ATR: 1127.08846607
+
+Trend condition met at 2024-01-16 12:00:00
+Exit KAMA: 42888.61964379
+KAMA2: 43373.53237578
+
+Fusion condition at 2024-01-16 16:00:00: True
+Fusion MA: 1447.48490164
+Fusion ATR: 1009.73893996
+
+Trend condition met at 2024-01-16 16:00:00
+Exit KAMA: 42888.79158062
+KAMA2: 43369.60381619
+
+Fusion condition at 2024-01-16 20:00:00: True
+Fusion MA: 1438.47166479
+Fusion ATR: 1195.06775462
+
+Trend condition met at 2024-01-16 20:00:00
+Exit KAMA: 42894.25519818
+KAMA2: 43367.60360893
+
+Fusion condition at 2024-01-17 00:00:00: True
+Fusion MA: 1439.29611289
+Fusion ATR: 1202.30818152
+
+Trend condition met at 2024-01-17 00:00:00
+Exit KAMA: 42899.13674042
+KAMA2: 43365.61300082
+
+Fusion condition at 2024-01-17 04:00:00: True
+Fusion MA: 1452.94443998
+Fusion ATR: 1203.20401323
+
+Trend condition met at 2024-01-17 04:00:00
+Exit KAMA: 42902.71625436
+KAMA2: 43362.73249725
+
+Fusion condition at 2024-01-17 08:00:00: True
+Fusion MA: 1454.89371678
+Fusion ATR: 1175.30317140
+
+Trend condition met at 2024-01-17 08:00:00
+Exit KAMA: 42901.98040336
+KAMA2: 43358.44478997
+
+Fusion condition at 2024-01-17 12:00:00: True
+Fusion MA: 1453.41923803
+Fusion ATR: 1035.17782055
+
+Trend condition met at 2024-01-17 12:00:00
+Exit KAMA: 42890.03503015
+KAMA2: 43353.09295827
+
+Fusion condition at 2024-01-17 16:00:00: True
+Fusion MA: 1450.23419139
+Fusion ATR: 981.59865290
+
+Trend condition met at 2024-01-17 16:00:00
+Exit KAMA: 42887.28954475
+KAMA2: 43331.47696605
+
+Fusion condition at 2024-01-17 20:00:00: True
+Fusion MA: 1437.35646120
+Fusion ATR: 972.09667917
+
+Trend condition met at 2024-01-17 20:00:00
+Exit KAMA: 42880.07220196
+KAMA2: 43323.57623769
+
+Fusion condition at 2024-01-18 00:00:00: True
+Fusion MA: 1430.44096097
+Fusion ATR: 980.01128426
+
+Trend condition met at 2024-01-18 00:00:00
+Exit KAMA: 42876.86803078
+KAMA2: 43316.60786486
+
+Fusion condition at 2024-01-18 04:00:00: True
+Fusion MA: 1425.14422936
+Fusion ATR: 974.01674725
+
+Trend condition met at 2024-01-18 04:00:00
+Exit KAMA: 42873.56967833
+KAMA2: 43311.66837298
+
+Fusion condition at 2024-01-18 08:00:00: True
+Fusion MA: 1421.61586512
+Fusion ATR: 659.35876872
+
+Trend condition met at 2024-01-18 08:00:00
+Exit KAMA: 42864.70828524
+KAMA2: 43300.61988945
+
+Fusion condition at 2024-01-18 12:00:00: True
+Fusion MA: 1397.24306814
+Fusion ATR: 615.10450884
+
+Trend condition met at 2024-01-18 12:00:00
+Exit KAMA: 42866.40640466
+KAMA2: 43296.97736558
+
+Fusion condition at 2024-01-18 16:00:00: True
+Fusion MA: 1381.23083696
+Fusion ATR: 614.11144787
+
+Trend condition met at 2024-01-18 16:00:00
+Exit KAMA: 42856.06703634
+KAMA2: 43290.66850187
+
+Fusion condition at 2024-01-18 20:00:00: True
+Fusion MA: 1368.98980575
+Fusion ATR: 626.64208131
+
+Trend condition met at 2024-01-18 20:00:00
+Exit KAMA: 42851.80932913
+KAMA2: 43278.54805598
+
+Fusion condition at 2024-01-19 00:00:00: True
+Fusion MA: 1345.78263959
+Fusion ATR: 1185.81818435
+
+Trend condition met at 2024-01-19 00:00:00
+Exit KAMA: 42611.20570250
+KAMA2: 43121.10997843
+
+Fusion condition at 2024-01-19 04:00:00: True
+Fusion MA: 1325.38049937
+Fusion ATR: 1203.18215349
+
+Trend condition met at 2024-01-19 04:00:00
+Exit KAMA: 42433.00941481
+KAMA2: 43020.02283647
+
+Fusion condition at 2024-01-19 08:00:00: True
+Fusion MA: 1307.38386055
+Fusion ATR: 1236.56312261
+
+Trend condition met at 2024-01-19 08:00:00
+Exit KAMA: 42228.15364914
+KAMA2: 42842.01107045
+
+Fusion condition at 2024-01-19 12:00:00: True
+Fusion MA: 1243.88940854
+Fusion ATR: 1243.23319134
+
+Trend condition met at 2024-01-19 12:00:00
+Exit KAMA: 42119.91009334
+KAMA2: 42733.09764019
+
+Fusion condition at 2024-01-19 16:00:00: False
+Fusion MA: 1226.21326186
+Fusion ATR: 1251.32060359
+
+Trend condition met at 2024-01-19 16:00:00
+Exit KAMA: 42069.46793252
+KAMA2: 42661.78580900
+
+Fusion condition at 2024-01-19 20:00:00: False
+Fusion MA: 1205.07830559
+Fusion ATR: 1263.10127174
+
+Trend condition met at 2024-01-19 20:00:00
+Exit KAMA: 41955.06808611
+KAMA2: 42547.85602958
+
+Fusion condition at 2024-01-20 00:00:00: False
+Fusion MA: 1192.04084716
+Fusion ATR: 1526.23448187
+
+Trend condition met at 2024-01-20 00:00:00
+Exit KAMA: 41950.27011982
+KAMA2: 42531.46699595
+
+Fusion condition at 2024-01-20 04:00:00: False
+Fusion MA: 1124.03856229
+Fusion ATR: 1518.72957997
+
+Trend condition met at 2024-01-20 04:00:00
+Exit KAMA: 41940.73899490
+KAMA2: 42508.83789179
+
+Fusion condition at 2024-01-20 08:00:00: False
+Fusion MA: 1084.90949103
+Fusion ATR: 1533.12524306
+
+Trend condition met at 2024-01-20 08:00:00
+Exit KAMA: 41928.64911455
+KAMA2: 42489.05611042
+
+Fusion condition at 2024-01-20 12:00:00: False
+Fusion MA: 1066.43650232
+Fusion ATR: 1226.74798116
+
+Trend condition met at 2024-01-20 12:00:00
+Exit KAMA: 41915.46572846
+KAMA2: 42467.51995917
+
+Fusion condition at 2024-01-20 16:00:00: False
+Fusion MA: 1052.49423840
+Fusion ATR: 1223.98311818
+
+Trend condition met at 2024-01-20 16:00:00
+Exit KAMA: 41900.99996609
+KAMA2: 42438.82621923
+
+Fusion condition at 2024-01-20 20:00:00: False
+Fusion MA: 1037.48706415
+Fusion ATR: 1212.81377777
+
+Trend condition met at 2024-01-20 20:00:00
+Exit KAMA: 41879.50759263
+KAMA2: 42413.98732877
+
+Fusion condition at 2024-01-21 00:00:00: False
+Fusion MA: 1027.48984111
+Fusion ATR: 1218.67333487
+
+Trend condition met at 2024-01-21 00:00:00
+Exit KAMA: 41868.55199854
+KAMA2: 42384.12792645
+
+Fusion condition at 2024-01-21 04:00:00: False
+Fusion MA: 993.82583982
+Fusion ATR: 1236.19837646
+
+Trend condition met at 2024-01-21 04:00:00
+Exit KAMA: 41860.75624227
+KAMA2: 42365.70366814
+
+Fusion condition at 2024-01-21 08:00:00: False
+Fusion MA: 941.13326325
+Fusion ATR: 1229.10311747
+
+Trend condition met at 2024-01-21 08:00:00
+Exit KAMA: 41851.69961358
+KAMA2: 42345.23407027
+
+Fusion condition at 2024-01-21 12:00:00: True
+Fusion MA: 874.58204564
+Fusion ATR: 476.67150064
+
+Trend condition met at 2024-01-21 12:00:00
+Exit KAMA: 41846.18924699
+KAMA2: 42323.96291672
+
+Fusion condition at 2024-01-21 16:00:00: True
+Fusion MA: 849.46051515
+Fusion ATR: 282.06039397
+
+Trend condition met at 2024-01-21 16:00:00
+Exit KAMA: 41838.25367035
+KAMA2: 42310.96318324
+
+Fusion condition at 2024-01-21 20:00:00: True
+Fusion MA: 830.27496716
+Fusion ATR: 287.82055482
+
+Trend condition met at 2024-01-21 20:00:00
+Exit KAMA: 41831.77950141
+KAMA2: 42288.32363550
+
+Fusion condition at 2024-01-22 00:00:00: True
+Fusion MA: 810.66012084
+Fusion ATR: 287.18405188
+
+Trend condition met at 2024-01-22 00:00:00
+Exit KAMA: 41828.89753719
+KAMA2: 42273.06334682
+
+Fusion condition at 2024-01-22 04:00:00: True
+Fusion MA: 792.56842953
+Fusion ATR: 301.64148654
+
+Trend condition met at 2024-01-22 04:00:00
+Exit KAMA: 41802.68152860
+KAMA2: 42265.29334743
+
+Fusion condition at 2024-01-22 08:00:00: True
+Fusion MA: 773.78535969
+Fusion ATR: 439.59389031
+
+Trend condition met at 2024-01-22 08:00:00
+Exit KAMA: 41707.45964771
+KAMA2: 42242.30409006
+
+Fusion condition at 2024-01-22 12:00:00: True
+Fusion MA: 758.36699443
+Fusion ATR: 572.87153617
+
+Trend condition met at 2024-01-22 12:00:00
+Exit KAMA: 41603.33119438
+KAMA2: 42113.86953652
+
+Fusion condition at 2024-01-22 16:00:00: True
+Fusion MA: 744.58279476
+Fusion ATR: 693.57775793
+
+Trend condition met at 2024-01-22 16:00:00
+Exit KAMA: 41453.54092641
+KAMA2: 41967.07985455
+
+Fusion condition at 2024-01-22 20:00:00: False
+Fusion MA: 734.77458242
+Fusion ATR: 845.35042774
+
+Trend condition met at 2024-01-22 20:00:00
+Exit KAMA: 41313.03550954
+KAMA2: 41830.08643852
+
+Fusion condition at 2024-01-23 00:00:00: False
+Fusion MA: 742.29079029
+Fusion ATR: 1193.32802900
+
+Trend condition met at 2024-01-23 00:00:00
+Exit KAMA: 40883.85449427
+KAMA2: 41494.69346747
+
+Fusion condition at 2024-01-23 04:00:00: False
+Fusion MA: 748.84351665
+Fusion ATR: 1225.58548353
+
+Trend condition met at 2024-01-23 04:00:00
+Exit KAMA: 40487.69986532
+KAMA2: 41162.73065749
+
+Fusion condition at 2024-01-23 08:00:00: False
+Fusion MA: 753.93376104
+Fusion ATR: 1236.37028737
+
+Trend condition met at 2024-01-23 08:00:00
+Exit KAMA: 40402.66618099
+KAMA2: 41053.66061673
+
+Fusion condition at 2024-01-23 12:00:00: False
+Fusion MA: 761.06642693
+Fusion ATR: 1236.25260806
+
+Trend condition met at 2024-01-23 12:00:00
+Exit KAMA: 40274.19506158
+KAMA2: 40912.58106856
+
+Fusion condition at 2024-01-23 16:00:00: False
+Fusion MA: 773.90636088
+Fusion ATR: 1348.12151042
+
+Trend condition met at 2024-01-23 16:00:00
+Exit KAMA: 39912.12141482
+KAMA2: 40610.22948659
+
+Fusion condition at 2024-01-23 20:00:00: False
+Fusion MA: 784.74455265
+Fusion ATR: 1362.23404427
+
+Trend condition met at 2024-01-23 20:00:00
+Exit KAMA: 39786.94057811
+KAMA2: 40463.19410089
+
+Fusion condition at 2024-01-24 00:00:00: False
+Fusion MA: 793.25215083
+Fusion ATR: 1353.35889619
+
+Trend condition met at 2024-01-24 00:00:00
+Exit KAMA: 39664.02823551
+KAMA2: 40324.86793855
+
+Fusion condition at 2024-01-24 04:00:00: False
+Fusion MA: 801.06761748
+Fusion ATR: 1380.76364893
+
+Trend condition met at 2024-01-24 04:00:00
+Exit KAMA: 39684.71725780
+KAMA2: 40300.94638851
+
+Fusion condition at 2024-01-24 08:00:00: False
+Fusion MA: 805.99990777
+Fusion ATR: 1358.54271572
+
+Trend condition met at 2024-01-24 08:00:00
+Exit KAMA: 39677.14548064
+KAMA2: 40258.81417126
+
+Fusion condition at 2024-01-24 12:00:00: False
+Fusion MA: 807.13564647
+Fusion ATR: 1196.67185892
+
+Trend condition met at 2024-01-24 12:00:00
+Exit KAMA: 39698.33336928
+KAMA2: 40245.82674696
+
+Fusion condition at 2024-01-24 16:00:00: False
+Fusion MA: 807.82151890
+Fusion ATR: 1176.87680300
+
+Trend condition met at 2024-01-24 16:00:00
+Exit KAMA: 39719.29934617
+KAMA2: 40244.54651366
+
+Fusion condition at 2024-01-24 20:00:00: False
+Fusion MA: 808.21742639
+Fusion ATR: 1151.90944984
+
+Trend condition met at 2024-01-24 20:00:00
+Exit KAMA: 39732.95940505
+KAMA2: 40238.65422873
+
+Fusion condition at 2024-01-25 00:00:00: False
+Fusion MA: 809.70695556
+Fusion ATR: 1149.82477781
+
+Trend condition met at 2024-01-25 00:00:00
+Exit KAMA: 39735.89842415
+KAMA2: 40224.55269744
+
+Fusion condition at 2024-01-25 04:00:00: False
+Fusion MA: 805.94383872
+Fusion ATR: 1017.09586696
+
+Trend condition met at 2024-01-25 04:00:00
+Exit KAMA: 39745.55425117
+KAMA2: 40221.76763743
+
+Fusion condition at 2024-01-25 08:00:00: False
+Fusion MA: 803.03843619
+Fusion ATR: 923.26771013
+
+Trend condition met at 2024-01-25 08:00:00
+Exit KAMA: 39749.31669977
+KAMA2: 40217.47470104
+
+Fusion condition at 2024-01-25 12:00:00: False
+Fusion MA: 799.70804790
+Fusion ATR: 872.08017604
+
+Trend condition met at 2024-01-25 12:00:00
+Exit KAMA: 39759.86455829
+KAMA2: 40216.34143600
+
+Fusion condition at 2024-01-25 16:00:00: True
+Fusion MA: 795.72021388
+Fusion ATR: 785.31280795
+
+Trend condition met at 2024-01-25 16:00:00
+Exit KAMA: 39765.87129181
+KAMA2: 40215.56702475
+
+Fusion condition at 2024-01-25 20:00:00: True
+Fusion MA: 790.30826421
+Fusion ATR: 783.15593327
+
+Trend condition met at 2024-01-25 20:00:00
+Exit KAMA: 39766.24337173
+KAMA2: 40211.03466432
+
+Fusion condition at 2024-01-26 00:00:00: True
+Fusion MA: 785.79024177
+Fusion ATR: 757.35466712
+
+Trend condition met at 2024-01-26 00:00:00
+Exit KAMA: 39783.78242458
+KAMA2: 40208.52755084
+
+Fusion condition at 2024-01-26 04:00:00: True
+Fusion MA: 785.28235962
+Fusion ATR: 710.38650928
+
+Trend condition met at 2024-01-26 04:00:00
+Exit KAMA: 39793.20267773
+KAMA2: 40196.92988259
+
+Fusion condition at 2024-01-26 08:00:00: True
+Fusion MA: 784.04742609
+Fusion ATR: 695.52954912
+
+Trend condition met at 2024-01-26 08:00:00
+Exit KAMA: 39811.31427826
+KAMA2: 40192.01516968
+
+Fusion condition at 2024-01-26 12:00:00: True
+Fusion MA: 782.25148900
+Fusion ATR: 658.42329267
+
+Trend condition met at 2024-01-26 12:00:00
+Exit KAMA: 39813.27519739
+KAMA2: 40184.13423086
+
+Fusion condition at 2024-01-26 16:00:00: False
+Fusion MA: 780.63979102
+Fusion ATR: 927.67244777
+
+Trend condition met at 2024-01-26 16:00:00
+Exit KAMA: 40003.30895220
+KAMA2: 40244.53276034
+
+Fusion condition at 2024-01-26 20:00:00: False
+Fusion MA: 780.77140109
+Fusion ATR: 964.45557270
+
+Trend condition met at 2024-01-26 20:00:00
+Exit KAMA: 40165.14120715
+KAMA2: 40340.48324013
+
+Fusion condition at 2024-01-27 00:00:00: False
+Fusion MA: 783.87243391
+Fusion ATR: 1015.58123564
+
+Trend condition met at 2024-01-27 00:00:00
+Exit KAMA: 40429.81050702
+KAMA2: 40495.56122961
+
+Trend condition met at 2024-01-27 04:00:00
+Exit KAMA: 40605.77996514
+KAMA2: 40579.51529939
+
+Fusion condition at 2024-01-27 04:00:00: False
+Fusion MA: 788.21735011
+Fusion ATR: 1018.95209683
+
+Trend condition met at 2024-01-27 08:00:00
+Exit KAMA: 40808.78481273
+KAMA2: 40672.03461351
+
+Fusion condition at 2024-01-27 08:00:00: False
+Fusion MA: 784.37534591
+Fusion ATR: 999.62214297
+
+Trend condition met at 2024-01-27 12:00:00
+Exit KAMA: 40927.03798677
+KAMA2: 40763.24902796
+
+Fusion condition at 2024-01-27 12:00:00: False
+Fusion MA: 781.47485833
+Fusion ATR: 1014.69699048
+
+Trend condition met at 2024-01-27 16:00:00
+Exit KAMA: 41050.28859952
+KAMA2: 40843.24119431
+
+Fusion condition at 2024-01-27 16:00:00: False
+Fusion MA: 778.93985085
+Fusion ATR: 1018.80081863
+
+Trend condition met at 2024-01-27 20:00:00
+Exit KAMA: 41159.96141048
+KAMA2: 40930.04203888
+
+Fusion condition at 2024-01-27 20:00:00: False
+Fusion MA: 776.70027590
+Fusion ATR: 1014.20750600
+
+Trend condition met at 2024-01-28 00:00:00
+Exit KAMA: 41270.05303537
+KAMA2: 41016.98196094
+
+Fusion condition at 2024-01-28 00:00:00: False
+Fusion MA: 774.64829323
+Fusion ATR: 1021.22668140
+
+Trend condition met at 2024-01-28 04:00:00
+Exit KAMA: 41482.03870812
+KAMA2: 41120.83954541
+
+Fusion condition at 2024-01-28 04:00:00: True
+Fusion MA: 768.31899179
+Fusion ATR: 748.53415872
+
+Long entry signal at 2024-01-28 04:00:00
+Entry KAMA Delta: 63.59213523
+Entry Limit: 21.96840867
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+KAMA exit condition met at 2024-02-01 16:00:00
+Exit KAMA Delta: -59.92297435
+Exit KAMA Limit: -43.23801135
+Negative Limit: -43.23801135
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Long exit signal at 2024-02-01 16:00:00
+Exit reason: KAMA exit signal
+
+Trend condition met at 2024-02-01 20:00:00
+Exit KAMA: 42719.70512860
+KAMA2: 42466.14581336
+
+Fusion condition at 2024-02-01 20:00:00: False
+Fusion MA: 640.49696006
+Fusion ATR: 1091.06219367
+
+Trend condition met at 2024-02-02 00:00:00
+Exit KAMA: 42728.41723481
+KAMA2: 42473.40405236
+
+Fusion condition at 2024-02-02 00:00:00: False
+Fusion MA: 641.16179703
+Fusion ATR: 1151.99453638
+
+Trend condition met at 2024-02-02 04:00:00
+Exit KAMA: 42734.33958088
+KAMA2: 42482.76898550
+
+Fusion condition at 2024-02-02 04:00:00: False
+Fusion MA: 638.34461766
+Fusion ATR: 1123.10555763
+
+Trend condition met at 2024-02-02 08:00:00
+Exit KAMA: 42741.72847917
+KAMA2: 42490.11698924
+
+Fusion condition at 2024-02-02 08:00:00: False
+Fusion MA: 636.31335301
+Fusion ATR: 1053.96065465
+
+Trend condition met at 2024-02-02 12:00:00
+Exit KAMA: 42746.28736364
+KAMA2: 42499.63941569
+
+Fusion condition at 2024-02-02 12:00:00: False
+Fusion MA: 636.02393847
+Fusion ATR: 1019.03306088
+
+Trend condition met at 2024-02-02 16:00:00
+Exit KAMA: 42752.50791724
+KAMA2: 42507.05366479
+
+Fusion condition at 2024-02-02 16:00:00: False
+Fusion MA: 635.42354188
+Fusion ATR: 861.90186213
+
+Trend condition met at 2024-02-02 20:00:00
+Exit KAMA: 42759.67937067
+KAMA2: 42517.01435426
+
+Fusion condition at 2024-02-02 20:00:00: False
+Fusion MA: 634.73609801
+Fusion ATR: 850.34828149
+
+Trend condition met at 2024-02-03 00:00:00
+Exit KAMA: 42766.83770944
+KAMA2: 42521.24122485
+
+Fusion condition at 2024-02-03 00:00:00: False
+Fusion MA: 636.01821687
+Fusion ATR: 893.01705849
+
+Trend condition met at 2024-02-03 04:00:00
+Exit KAMA: 42773.26949700
+KAMA2: 42534.85281523
+
+Fusion condition at 2024-02-03 04:00:00: False
+Fusion MA: 638.40488305
+Fusion ATR: 910.12469078
+
+Trend condition met at 2024-02-03 08:00:00
+Exit KAMA: 42779.21268032
+KAMA2: 42542.46537236
+
+Fusion condition at 2024-02-03 08:00:00: False
+Fusion MA: 640.48243523
+Fusion ATR: 793.83123100
+
+Trend condition met at 2024-02-03 12:00:00
+Exit KAMA: 42789.19624462
+KAMA2: 42549.75084071
+
+Fusion condition at 2024-02-03 12:00:00: False
+Fusion MA: 641.50207044
+Fusion ATR: 667.84232257
+
+Trend condition met at 2024-02-03 16:00:00
+Exit KAMA: 42812.52565525
+KAMA2: 42559.29833206
+
+Fusion condition at 2024-02-03 16:00:00: False
+Fusion MA: 642.05489938
+Fusion ATR: 656.37954710
+
+Trend condition met at 2024-02-03 20:00:00
+Exit KAMA: 42845.76694629
+KAMA2: 42601.19161030
+
+Fusion condition at 2024-02-03 20:00:00: False
+Fusion MA: 642.57720421
+Fusion ATR: 650.77975855
+
+Trend condition met at 2024-02-04 00:00:00
+Exit KAMA: 42871.46884052
+KAMA2: 42628.04370176
+
+Fusion condition at 2024-02-04 00:00:00: False
+Fusion MA: 639.83220446
+Fusion ATR: 650.54367452
+
+Trend condition met at 2024-02-04 04:00:00
+Exit KAMA: 42880.09663428
+KAMA2: 42652.90862069
+
+Fusion condition at 2024-02-04 04:00:00: False
+Fusion MA: 636.44472917
+Fusion ATR: 668.90154052
+
+Trend condition met at 2024-02-04 08:00:00
+Exit KAMA: 42885.39996172
+KAMA2: 42667.94005744
+
+Fusion condition at 2024-02-04 08:00:00: True
+Fusion MA: 630.55289677
+Fusion ATR: 522.02513196
+
+Long entry signal at 2024-02-04 08:00:00
+Entry KAMA Delta: 28.08810325
+Entry Limit: 5.53022224
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+KAMA exit condition met at 2024-02-05 00:00:00
+Exit KAMA Delta: -18.09652929
+Exit KAMA Limit: -12.13346132
+Negative Limit: -12.13346132
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Long exit signal at 2024-02-05 00:00:00
+Exit reason: KAMA exit signal
+
+Trend condition met at 2024-02-05 04:00:00
+Exit KAMA: 42838.78068779
+KAMA2: 42675.46718850
+
+Fusion condition at 2024-02-05 04:00:00: True
+Fusion MA: 602.15151157
+Fusion ATR: 548.58265958
+
+Trend condition met at 2024-02-05 08:00:00
+Exit KAMA: 42833.06043763
+KAMA2: 42677.32838365
+
+Fusion condition at 2024-02-05 08:00:00: True
+Fusion MA: 597.96123575
+Fusion ATR: 576.57811113
+
+Trend condition met at 2024-02-05 12:00:00
+Exit KAMA: 42837.44800746
+KAMA2: 42680.45719776
+
+Fusion condition at 2024-02-05 12:00:00: False
+Fusion MA: 596.09917242
+Fusion ATR: 626.09587111
+
+Trend condition met at 2024-02-05 16:00:00
+Exit KAMA: 42841.10443240
+KAMA2: 42684.45440818
+
+Fusion condition at 2024-02-05 16:00:00: False
+Fusion MA: 595.62746306
+Fusion ATR: 621.06761091
+
+Trend condition met at 2024-02-05 20:00:00
+Exit KAMA: 42833.60709025
+KAMA2: 42683.20456233
+
+Fusion condition at 2024-02-05 20:00:00: False
+Fusion MA: 601.53020799
+Fusion ATR: 801.44049729
+
+Trend condition met at 2024-02-06 00:00:00
+Exit KAMA: 42832.07544377
+KAMA2: 42684.70629761
+
+Fusion condition at 2024-02-06 00:00:00: False
+Fusion MA: 604.77308776
+Fusion ATR: 784.99824613
+
+Trend condition met at 2024-02-06 04:00:00
+Exit KAMA: 42827.35775033
+KAMA2: 42685.14358620
+
+Fusion condition at 2024-02-06 04:00:00: False
+Fusion MA: 607.48138769
+Fusion ATR: 787.14514787
+
+Trend condition met at 2024-02-06 08:00:00
+Exit KAMA: 42827.85560198
+KAMA2: 42688.01707999
+
+Fusion condition at 2024-02-06 08:00:00: False
+Fusion MA: 609.87927874
+Fusion ATR: 795.15239548
+
+Trend condition met at 2024-02-06 12:00:00
+Exit KAMA: 42828.81016588
+KAMA2: 42690.71957497
+
+Fusion condition at 2024-02-06 12:00:00: False
+Fusion MA: 611.91338955
+Fusion ATR: 793.00149979
+
+Trend condition met at 2024-02-06 16:00:00
+Exit KAMA: 42828.77297465
+KAMA2: 42692.60685170
+
+Fusion condition at 2024-02-06 16:00:00: False
+Fusion MA: 612.03394129
+Fusion ATR: 738.07135678
+
+Trend condition met at 2024-02-06 20:00:00
+Exit KAMA: 42842.26405474
+KAMA2: 42700.32646898
+
+Fusion condition at 2024-02-06 20:00:00: False
+Fusion MA: 611.95147038
+Fusion ATR: 761.80586267
+
+Trend condition met at 2024-02-07 00:00:00
+Exit KAMA: 42851.43813724
+KAMA2: 42713.80341565
+
+Fusion condition at 2024-02-07 00:00:00: False
+Fusion MA: 611.91119703
+Fusion ATR: 739.38974154
+
+Trend condition met at 2024-02-07 04:00:00
+Exit KAMA: 42855.60767883
+KAMA2: 42717.12856400
+
+Fusion condition at 2024-02-07 04:00:00: False
+Fusion MA: 612.39361548
+Fusion ATR: 744.85308700
+
+Trend condition met at 2024-02-07 08:00:00
+Exit KAMA: 42854.64409268
+KAMA2: 42718.08686401
+
+Fusion condition at 2024-02-07 08:00:00: True
+Fusion MA: 610.05144797
+Fusion ATR: 598.37850509
+
+Trend condition met at 2024-02-07 12:00:00
+Exit KAMA: 42856.43301296
+KAMA2: 42721.47954382
+
+Fusion condition at 2024-02-07 12:00:00: True
+Fusion MA: 608.02877967
+Fusion ATR: 593.31016843
+
+Long entry signal at 2024-02-07 12:00:00
+Entry KAMA Delta: 2.66987008
+Entry Limit: 1.32301803
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+KAMA exit condition met at 2024-02-21 16:00:00
+Exit KAMA Delta: -40.50944147
+Exit KAMA Limit: -18.40666720
+Negative Limit: -18.40666720
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Long exit signal at 2024-02-21 16:00:00
+Exit reason: KAMA exit signal
+
+Trend condition met at 2024-02-21 20:00:00
+Exit KAMA: 51594.31354411
+KAMA2: 51098.71044370
+
+Fusion condition at 2024-02-21 20:00:00: False
+Fusion MA: 914.76676510
+Fusion ATR: 1478.15179682
+
+Trend condition met at 2024-02-22 00:00:00
+Exit KAMA: 51555.81789381
+KAMA2: 51096.81706082
+
+Fusion condition at 2024-02-22 00:00:00: False
+Fusion MA: 914.96164402
+Fusion ATR: 1474.55875874
+
+Trend condition met at 2024-02-22 04:00:00
+Exit KAMA: 51560.65144363
+KAMA2: 51108.95570711
+
+Fusion condition at 2024-02-22 04:00:00: False
+Fusion MA: 903.64197714
+Fusion ATR: 1510.75461999
+
+Trend condition met at 2024-02-22 08:00:00
+Exit KAMA: 51561.03856978
+KAMA2: 51117.14994728
+
+Fusion condition at 2024-02-22 08:00:00: False
+Fusion MA: 895.10562380
+Fusion ATR: 1258.83458096
+
+Trend condition met at 2024-02-22 12:00:00
+Exit KAMA: 51563.77569851
+KAMA2: 51122.59393947
+
+Fusion condition at 2024-02-22 12:00:00: False
+Fusion MA: 887.84855003
+Fusion ATR: 1101.07726621
+
+Trend condition met at 2024-02-22 16:00:00
+Exit KAMA: 51564.35880387
+KAMA2: 51127.50432017
+
+Fusion condition at 2024-02-22 16:00:00: False
+Fusion MA: 885.30709424
+Fusion ATR: 1087.58744876
+
+Trend condition met at 2024-02-22 20:00:00
+Exit KAMA: 51564.94200129
+KAMA2: 51131.24820839
+
+Fusion condition at 2024-02-22 20:00:00: False
+Fusion MA: 882.46287953
+Fusion ATR: 1120.44459756
+
+Trend condition met at 2024-02-23 00:00:00
+Exit KAMA: 51562.81899900
+KAMA2: 51136.26782874
+
+Fusion condition at 2024-02-23 00:00:00: False
+Fusion MA: 860.30995979
+Fusion ATR: 1080.68763199
+
+Trend condition met at 2024-02-23 04:00:00
+Exit KAMA: 51556.54301360
+KAMA2: 51141.01032105
+
+Fusion condition at 2024-02-23 04:00:00: False
+Fusion MA: 842.47656325
+Fusion ATR: 1054.51610236
+
+Trend condition met at 2024-02-23 08:00:00
+Exit KAMA: 51528.63367309
+KAMA2: 51140.15746979
+
+Fusion condition at 2024-02-23 08:00:00: False
+Fusion MA: 831.75590514
+Fusion ATR: 1014.22886639
+
+Trend condition met at 2024-02-23 12:00:00
+Exit KAMA: 51474.32654677
+KAMA2: 51130.17895917
+
+Fusion condition at 2024-02-23 12:00:00: False
+Fusion MA: 823.91376232
+Fusion ATR: 970.96494906
+
+Trend condition met at 2024-02-23 16:00:00
+Exit KAMA: 51462.86086588
+KAMA2: 51133.44814587
+
+Fusion condition at 2024-02-23 16:00:00: False
+Fusion MA: 814.51065816
+Fusion ATR: 857.71971875
+
+Trend condition met at 2024-02-23 20:00:00
+Exit KAMA: 51441.55533150
+KAMA2: 51124.93320273
+
+Fusion condition at 2024-02-23 20:00:00: False
+Fusion MA: 804.58066946
+Fusion ATR: 826.04879728
+
+Trend condition met at 2024-02-24 00:00:00
+Exit KAMA: 51436.75451441
+KAMA2: 51124.45021735
+
+Fusion condition at 2024-02-24 00:00:00: False
+Fusion MA: 796.00833409
+Fusion ATR: 826.14582375
+
+Trend condition met at 2024-02-24 04:00:00
+Exit KAMA: 51418.29315331
+KAMA2: 51119.67906940
+
+Fusion condition at 2024-02-24 04:00:00: False
+Fusion MA: 782.06201430
+Fusion ATR: 841.63870983
+
+Trend condition met at 2024-02-24 08:00:00
+Exit KAMA: 51408.75913942
+KAMA2: 51115.63776496
+
+Fusion condition at 2024-02-24 08:00:00: True
+Fusion MA: 771.97294739
+Fusion ATR: 767.06269606
+
+Trend condition met at 2024-02-24 12:00:00
+Exit KAMA: 51387.61658205
+KAMA2: 51115.27299337
+
+Fusion condition at 2024-02-24 12:00:00: False
+Fusion MA: 770.40021189
+Fusion ATR: 780.03262224
+
+Trend condition met at 2024-02-24 16:00:00
+Exit KAMA: 51377.47749345
+KAMA2: 51115.43477959
+
+Fusion condition at 2024-02-24 16:00:00: True
+Fusion MA: 768.26150505
+Fusion ATR: 668.97490257
+
+Trend condition met at 2024-02-24 20:00:00
+Exit KAMA: 51358.04725690
+KAMA2: 51115.01583917
+
+Fusion condition at 2024-02-24 20:00:00: True
+Fusion MA: 766.06752650
+Fusion ATR: 624.63573175
+
+Trend condition met at 2024-02-25 00:00:00
+Exit KAMA: 51360.40834149
+KAMA2: 51121.94927108
+
+Fusion condition at 2024-02-25 00:00:00: True
+Fusion MA: 759.81869932
+Fusion ATR: 654.80301554
+
+Long entry signal at 2024-02-25 00:00:00
+Entry KAMA Delta: 6.15783861
+Entry Limit: 2.59435656
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+
+Processing long exit signals: 0it [00:00, ?it/s][AProcessing long exit signals: 0it [00:00, ?it/s]
+
+Processing short exit signals: 0it [00:00, ?it/s][AProcessing short exit signals: 0it [00:00, ?it/s]
+ 50%|█████     | 50/100100%|██████████| 100/100
+
+Trade List:
+============================================================================================================================================
+#   | Type   | Entry Time       | Exit Time        | Entry      | Exit       | Gross P/L  | Fees     | Net P/L    | %        | Exit Reason              
+============================================================================================================================================
+  1 | LONG   | 2024-01-28 04:00 | 2024-02-01 16:00 | $  42120.63 | $  42087.52 | $     -7.86 | $    8.00 | $    -15.86 |    -0.16% | KAMA exit signal         
+  2 | LONG   | 2024-02-04 08:00 | 2024-02-05 00:00 | $  43027.16 | $  42636.44 | $    -90.66 | $    7.95 | $    -98.61 |    -0.99% | KAMA exit signal         
+  3 | LONG   | 2024-02-07 12:00 | 2024-02-21 16:00 | $  42918.03 | $  50965.53 | $   1853.62 | $    8.65 | $   1844.97 |    18.66% | KAMA exit signal         
+============================================================================================================================================
+
+Overall Statistics:
+Gross Profit: $1755.10
+Total Fees: $24.60
+Net Profit: $1730.50
+Winning Trades: 1 of 3 (33.33%)
+Display data shape: (366, 35)
+Display data columns: ['price_open', 'price_high', 'price_low', 'price_close', 'volume_traded', 'entry_kama', 'kama2', 'exit_kama', 'entry_kama_delta', 'exit_kama_delta', 'entry_kama_delta_std', 'exit_kama_delta_std', 'entry_kama_delta_limit', 'exit_kama_delta_limit', 'ssl_down', 'ssl_up', 'ssl_signal', 'dema', 'bb_basis', 'bb_upper', 'bb_lower', 'momentum', 'rsi', 'adp', 'stoch', 'cci', 'diosc', 'cmf', 'long_entry', 'long_exit', 'short_entry', 'short_exit', 'bearish_div', 'bullish_div', 'exit_reason']
+
+=== Trade Statistics ===
+Total number of trades: 3
+
+Trade List:
+============================================================================================================================================
+#   | Type   | Entry Time          | Exit Time           | Entry      | Exit       | Gross P/L  | Fees     | Net P/L    | %        | Exit Reason              
+============================================================================================================================================
+  1 | LONG   | 2024-01-28 04:00    | 2024-02-01 16:00    | $42120.63   | $42087.52   | $-7.86      | $8.00     | $-15.86     |    -0.16% | KAMA exit signal         
+  2 | LONG   | 2024-02-04 08:00    | 2024-02-05 00:00    | $43027.16   | $42636.44   | $-90.66     | $7.95     | $-98.61     |    -0.99% | KAMA exit signal         
+  3 | LONG   | 2024-02-07 12:00    | 2024-02-21 16:00    | $42918.03   | $50965.53   | $1853.62    | $8.65     | $1844.97    |    18.66% | KAMA exit signal         
+============================================================================================================================================
+
+Summary Statistics:
+Initial Equity: $10,000.00
+Final Equity: $11,730.50
+Total Return: 17.30%
+Total Profit: $1,730.50
+Total Fees: $24.60
+Number of Trades: 3
+Win Rate: 33.33%
+Average Profit per Trade: $576.83
+Divergence indicators: ['adp_long', 'adp_short', 'cmf', 'stoch', 'diosc', 'cci', 'momentum']
+Total subplot rows: 10
+Row heights: [0.4, 0.15, 0.15, 0.04285714285714286, 0.04285714285714286, 0.04285714285714286, 0.04285714285714286, 0.04285714285714286, 0.04285714285714286, 0.04285714285714286]
+
+Creating subplots...
+
+Adding candlestick chart...
+
+Adding trade markers...
+
+Adding strategy traces...
+
+Adding strategy traces for direction: both
+Adding KAMA traces for long strategy
+Adding SSL traces for short strategy
+
+Adding divergence lines to price chart...
+
+Adding KAMA delta traces...
+
+Adding divergence indicator traces...
+
+Updating layout...
+
+Showing chart...

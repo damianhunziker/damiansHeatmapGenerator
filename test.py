@@ -194,12 +194,19 @@ def validate_parameters(exec_name: str, params: Dict[str, Any]) -> List[str]:
                     strategy_params = strategy_class.get_parameters()
                     for param_name, (default_value, description) in strategy_params.items():
                         if param_name not in params:
-                            if default_value is None:
-                                errors.append(f"Missing required strategy parameter: {param_name} - {description}")
+                            # Set default values for missing parameters
+                            params[param_name] = default_value
                         else:
                             try:
                                 # Try to convert the value to the correct type
-                                params[param_name] = type(default_value)(params[param_name])
+                                if isinstance(default_value, bool):
+                                    # Handle boolean values
+                                    if isinstance(params[param_name], str):
+                                        params[param_name] = params[param_name].lower() in ('true', '1', 'yes', 'y')
+                                    else:
+                                        params[param_name] = bool(params[param_name])
+                                else:
+                                    params[param_name] = type(default_value)(params[param_name])
                             except (ValueError, TypeError):
                                 errors.append(f"Invalid type for parameter {param_name}. Expected {type(default_value).__name__}")
                     break
@@ -219,6 +226,11 @@ def run_executable(exec_name: str, params: Dict[str, Any]) -> None:
         for error in errors:
             print(f"- {error}")
         return
+    
+    # Set default interval if not provided
+    if 'interval' not in params:
+        params['interval'] = '4h'
+        print(f"Using default interval: {params['interval']}")
     
     # Fetch data if needed
     cache_dir = "ohlc_cache"

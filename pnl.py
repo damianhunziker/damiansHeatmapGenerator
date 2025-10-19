@@ -79,6 +79,7 @@ def analyze_direction(timeframe_data, strategy_class, strategy_params, direction
     return {
         'trades': trades,
         'metrics': metrics,
+        'equity_curve': equity_curve,
         'equity_curve_timestamps': equity_curve_timestamps,
         'pnl_performance': pnl_performance,
         'buy_hold': buy_hold,
@@ -106,8 +107,9 @@ def calculate_realistic_direction_metrics(both_results, target_direction):
         return None
     
     # Berechne realistische Equity-Kurve basierend auf der Both-Analyse
-    # Starte mit der initialen Equity
-    initial_equity = 10000  # Standard Initial Equity
+    # Verwende die gleiche initiale Equity wie in der Both-Analyse
+    # Der erste Wert der Equity-Kurve ist die initiale Equity
+    initial_equity = both_results['equity_curve'][0] if 'equity_curve' in both_results and both_results['equity_curve'] else 10000
     current_equity = initial_equity
     direction_equity_curve = [initial_equity]
     direction_timestamps = [both_results['equity_curve_timestamps'][0]]
@@ -267,6 +269,7 @@ def calculate_realistic_direction_metrics(both_results, target_direction):
     return {
         'trades': direction_trades,
         'metrics': metrics,
+        'equity_curve': direction_equity_curve,
         'equity_curve_timestamps': direction_timestamps,
         'pnl_performance': pnl_performance,
         'buy_hold': buy_hold,
@@ -586,7 +589,7 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
             params='Short Strategy'
         )
     
-    # Create metrics comparison table
+    # Create metrics comparison table - only show available directions
     metrics_table = create_metrics_table(results_both, results_long, results_short)
     
     # Create trade list table for the primary direction
@@ -725,7 +728,8 @@ if __name__ == "__main__":
         'fee_pct': user_inputs['fee_pct'],
         'start_date': user_inputs['start_date'],
         'end_date': user_inputs['end_date'],
-        'asset': user_inputs['asset']
+        'asset': user_inputs['asset'],
+        'trade_direction': user_inputs.get('trade_direction', 'both')  # Ensure trade_direction is included
     })
     print(f"PNL - Strategy Params - start_date: {strategy_params.get('start_date')}, end_date: {strategy_params.get('end_date')}")
 
