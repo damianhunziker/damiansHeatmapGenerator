@@ -27,6 +27,15 @@ class BaseStrategy(ABC):
     def prepare_signals(self, data):
         """Prepares the trading signals"""
         pass
+
+    def get_indicator_subplots(self):
+        """Optional: strategy-specific indicator subplots for chart_analysis.
+
+        Returns a list of dicts:
+            {'title': str, 'traces': [{'column': str, 'name': str,
+                                       'color': str, 'dash': str (optional)}]}
+        """
+        return []
     
     def process_chunk(self, data):
         """Process data chunk and return trades using the base implementation"""

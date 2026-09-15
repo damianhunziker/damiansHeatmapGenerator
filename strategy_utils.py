@@ -22,28 +22,37 @@ def get_valid_date(date_string):
         return False
 
 def get_available_strategies():
-    """Automatically detects all available strategies in the strategies folder"""
+    """Automatically detects all available strategies in the strategy folders"""
     strategies = {}
-    strategy_files = [f for f in os.listdir('classes/strategies') if f.endswith('_strategy.py')]
-    
-    for idx, file in enumerate(strategy_files, 1):
+    # classes/strategies (private strategies repo) + classes/strategies_dmx (submodule)
+    strategy_dirs = ['classes/strategies', 'classes/strategies_dmx']
+    entries = []
+    for directory in strategy_dirs:
+        if not os.path.isdir(directory):
+            continue
+        for file in sorted(os.listdir(directory)):
+            if file.endswith('_strategy.py'):
+                entries.append((directory, file))
+
+    for idx, (directory, file) in enumerate(entries, 1):
         module_name = file[:-3]  # Remove .py
-        module = importlib.import_module(f'classes.strategies.{module_name}')
-        
+        module_path = f"{directory.replace('/', '.')}.{module_name}"
+        module = importlib.import_module(module_path)
+
         # Find all classes in the module that inherit from BaseStrategy
         strategy_found = False
         for name, obj in inspect.getmembers(module):
-            if (inspect.isclass(obj) and 
-                issubclass(obj, BaseStrategy) and 
+            if (inspect.isclass(obj) and
+                issubclass(obj, BaseStrategy) and
                 obj != BaseStrategy and
-                obj.__module__ == f'classes.strategies.{module_name}'):  # Nur Klassen aus diesem Modul
+                obj.__module__ == module_path):  # Nur Klassen aus diesem Modul
                 strategies[str(idx)] = (name, obj)
                 strategy_found = True
                 break
-                
+
         if not strategy_found:
             continue
-    
+
     return strategies
 
 def get_strategy_inputs(strategy_class):
@@ -415,8 +424,55 @@ def create_performance_chart(timestamps, pnl_performance, buy_hold, drawdown, ou
         return fig
     else:
         image_path = os.path.join(base_dir, f'pnl_image_{params}.png')
-        fig.write_image(image_path)
-        return image_path
+        os.makedirs(base_dir, exist_ok=True)
+        try:
+            fig.write_image(image_path)
+            return image_path
+        except Exception as exc:
+            print(f"Warning: Plotly static export unavailable ({exc.__class__.__name__}); "
+                  f"rendering PnL image with matplotlib instead.")
+            return _render_performance_image_matplotlib(
+                timestamps, pnl_performance, buy_hold, drawdown, image_path, title
+            )
+
+def _render_performance_image_matplotlib(timestamps, pnl_performance, buy_hold, drawdown, image_path, title):
+    """Fallback renderer for the PnL hover images when Plotly/Kaleido is unavailable."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    x = list(timestamps)
+    pnl = np.asarray(pnl_performance, dtype=float)
+    bh = np.asarray(buy_hold, dtype=float)
+    dd = np.asarray(drawdown, dtype=float)
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    fig.suptitle(title if title else 'Strategy Performance with Drawdown')
+
+    ax1.plot(x, pnl, color='green', linewidth=2, label='Strategy Performance')
+    ax1.fill_between(x, pnl, 0, where=pnl >= 0, color='green', alpha=0.1)
+    ax1.fill_between(x, pnl, 0, where=pnl < 0, color='red', alpha=0.1)
+    ax1.plot(x, bh, color='blue', linewidth=2, label='Buy & Hold')
+    ax1.set_ylabel('Performance %')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(loc='best')
+
+    ax1b = ax1.twinx()
+    ax1b.plot(x, dd, color='purple', alpha=0.5, linewidth=1, label='Drawdown')
+    ax1b.set_ylabel('Drawdown %')
+
+    ax2.plot(x, pnl, color='green', linewidth=2)
+    ax2.fill_between(x, pnl, 0, where=pnl >= 0, color='green', alpha=0.1)
+    ax2.fill_between(x, pnl, 0, where=pnl < 0, color='red', alpha=0.1)
+    ax2.set_ylabel('Performance %')
+    ax2.set_xlabel('Date')
+    ax2.grid(True, alpha=0.3)
+
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    fig.savefig(image_path, dpi=100)
+    plt.close(fig)
+    return image_path
 
 def get_trading_pairs():
     """Returns a list of default trading pairs"""

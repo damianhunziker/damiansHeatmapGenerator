@@ -1,0 +1,6 @@
+[submodule "classes/indicators"]
+	path = classes/indicators
+	url = https://github.com/damianhunziker/damiansHeatmapGeneratorIndicatorsPrivate.git
+[submodule "classes/strategies_dmx"]
+	path = classes/strategies_dmx
+	url = https://github.com/damianhunziker/damiansHeatmapGeneratorDMXPrivate.git

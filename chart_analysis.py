@@ -2,7 +2,9 @@ from tqdm import tqdm
 import sys
 import os
 import pandas as pd
+from datetime import datetime
 from strategy_utils import print_logo, get_user_inputs, get_strategy_inputs, fetch_data, get_available_strategies
+from html_viewer import publish_figure, print_viewer_info
 from classes.trade_analyzer import TradeAnalyzer
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
@@ -130,43 +132,39 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     
     # Check if Fusion Range Filter is enabled
     use_fusion_filter = strategy_params.get('use_fusion_for_long', False)
-    
-    # Calculate total number of rows needed (price chart + 2 KAMA delta charts + fusion filter + one row per divergence indicator)
-    total_rows = 1 + 2 + len(divergence_indicators)
+
+    # Strategy-defined indicator subplots (replaces the old hardcoded KAMA delta rows)
+    indicator_subplots = []
+    if hasattr(strategy, 'get_indicator_subplots'):
+        indicator_subplots = strategy.get_indicator_subplots() or []
+    print(f"Indicator subplots: {[sp.get('title') for sp in indicator_subplots]}")
+
+    # Calculate total number of rows needed (price chart + indicator subplots + fusion filter + one row per divergence indicator)
+    total_rows = 1 + len(indicator_subplots) + len(divergence_indicators)
     if use_fusion_filter:
         total_rows += 1  # Add row for Fusion Range Filter
     print(f"Total subplot rows: {total_rows}")
-    
+
     # Calculate row heights - indicators now get much more space
     # Price chart gets about 30%, indicators get majority of space (70% total)
     price_chart_ratio = 0.3   # Price chart gets 30% of total height
     remaining_ratio = 0.7      # All other subplots share 70% (much more space for indicators)
-    
+
     row_heights = [price_chart_ratio]  # Price chart gets 30%
-    
+
     # Calculate heights for remaining subplots
     remaining_subplots = total_rows - 1  # Exclude price chart
     if remaining_subplots > 0:
         subplot_height = remaining_ratio / remaining_subplots
-        
-        # KAMA delta charts
-        row_heights.extend([subplot_height] * 2)  # Two KAMA delta charts
-        
-        # Add Fusion Range Filter row if enabled
-        if use_fusion_filter:
-            row_heights.append(subplot_height)  # Fusion filter gets same height as others
-        
-        # Divergence indicators
-        if len(divergence_indicators) > 0:
-            row_heights.extend([subplot_height] * len(divergence_indicators))
-    
+        row_heights.extend([subplot_height] * remaining_subplots)
+
     print(f"Row heights: {row_heights}")
-    
+
     # Create subplot titles
-    subplot_titles = ['Price', 'Entry KAMA Delta', 'Exit KAMA Delta']
+    subplot_titles = ['Price'] + [sp.get('title', 'Indicator') for sp in indicator_subplots]
     if use_fusion_filter:
         subplot_titles.append('Fusion Range Filter')
-    
+
     subplot_titles.extend([f"{ind.split('_')[0]} (Long)" if ind.endswith('_long') else 
                           f"{ind.split('_')[0]} (Short)" if ind.endswith('_short') else
                           f"{ind} (Long)" if ind in strategy.indicators else f"{ind} (Short)" 
@@ -274,7 +272,7 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
         print(f"   Added {background_rectangles} background rectangles")
         
         # Add Fusion Range Filter indicator subplot with comprehensive visualization
-        fusion_row = 4  # After price, entry delta, exit delta
+        fusion_row = 2 + len(indicator_subplots)  # After price and indicator subplots
         
         # Add Fusion MA line (blue) - this is the HMA value
         fig.add_trace(go.Scatter(
@@ -508,43 +506,29 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
                         showlegend=False
                     ), row=1, col=1)
     
-    print("\nAdding KAMA delta traces...")
-    # Add KAMA delta traces (rows 2 and 3)
-    # Entry KAMA Delta
-    fig.add_trace(go.Scatter(
-        x=display_data.index,
-        y=display_data['entry_kama_delta'],
-        name='Entry KAMA Delta',
-        line=dict(color='blue', width=1)
-    ), row=2, col=1)
-    
-    fig.add_trace(go.Scatter(
-        x=display_data.index,
-        y=display_data['entry_kama_delta_limit'],
-        name='Entry KAMA Limit',
-        line=dict(color='red', width=1, dash='dash')
-    ), row=2, col=1)
-    
-    # Exit KAMA Delta
-    fig.add_trace(go.Scatter(
-        x=display_data.index,
-        y=display_data['exit_kama_delta'],
-        name='Exit KAMA Delta',
-        line=dict(color='blue', width=1)
-    ), row=3, col=1)
-    
-    fig.add_trace(go.Scatter(
-        x=display_data.index,
-        y=display_data['exit_kama_delta_limit'],
-        name='Exit KAMA Limit',
-        line=dict(color='red', width=1, dash='dash')
-    ), row=3, col=1)
+    print("\nAdding strategy indicator subplots...")
+    # Add strategy-defined indicator subplots (rows 2 .. 1+len(indicator_subplots))
+    for idx, subplot in enumerate(indicator_subplots):
+        subplot_row = 2 + idx
+        for trace_spec in subplot.get('traces', []):
+            column = trace_spec.get('column')
+            if column not in display_data.columns:
+                continue
+            line_style = dict(color=trace_spec.get('color', 'blue'), width=1)
+            if trace_spec.get('dash'):
+                line_style['dash'] = trace_spec['dash']
+            fig.add_trace(go.Scatter(
+                x=display_data.index,
+                y=display_data[column],
+                name=trace_spec.get('name', column),
+                line=line_style
+            ), row=subplot_row, col=1)
 
     print("\nAdding divergence indicator traces...")
     # --- Add divergence indicator subplots ---
     for idx, indicator in enumerate(divergence_indicators):
-        # Calculate subplot row: 1 price + 2 KAMA deltas + fusion filter (if enabled) + idx
-        subplot_row = 4 + idx
+        # Calculate subplot row: 1 price + indicator subplots + fusion filter (if enabled) + idx
+        subplot_row = 2 + len(indicator_subplots) + idx
         if use_fusion_filter:
             subplot_row += 1  # Add 1 for fusion filter row
         
@@ -840,13 +824,15 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     
     # Update y-axis titles
     fig.update_yaxes(title_text="Price", row=1, col=1)
-    fig.update_yaxes(title_text="Entry KAMA Delta", row=2, col=1)
-    fig.update_yaxes(title_text="Exit KAMA Delta", row=3, col=1)
-    
+
+    # Update y-axis titles for strategy indicator subplots
+    for idx, subplot in enumerate(indicator_subplots):
+        fig.update_yaxes(title_text=subplot.get('title', 'Indicator'), row=2 + idx, col=1)
+
     # Update y-axis titles for divergence indicators
     for idx, indicator in enumerate(divergence_indicators):
-        # Calculate subplot row: 1 price + 2 KAMA deltas + fusion filter (if enabled) + idx
-        subplot_row = 4 + idx
+        # Calculate subplot row: 1 price + indicator subplots + fusion filter (if enabled) + idx
+        subplot_row = 2 + len(indicator_subplots) + idx
         if use_fusion_filter:
             subplot_row += 1  # Add 1 for fusion filter row
         
@@ -855,11 +841,25 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
         indicator_type = 'Long' if indicator.endswith('_long') or indicator in strategy.indicators else 'Short'
         fig.update_yaxes(title_text=f"{base_indicator} ({indicator_type})", row=subplot_row, col=1)
     
-    print("\nShowing chart...")
-    # Chart anzeigen
-    fig.show()
-    
+    print("\nSaving chart...")
+    os.makedirs("html_cache", exist_ok=True)
+    chart_path = os.path.join("html_cache", _chart_filename(strategy, strategy_params))
+    publish_figure(fig, chart_path, label="Chart Analysis")
+
     return fig
+
+def _chart_filename(strategy, strategy_params):
+    """Build a descriptive, stable file name for the chart analysis output."""
+    parts = ["chart_analysis", strategy.__class__.__name__]
+    asset = strategy_params.get('asset')
+    interval = strategy_params.get('interval')
+    if asset:
+        parts.append(str(asset))
+    if interval:
+        parts.append(str(interval))
+    parts.append(datetime.now().strftime("%Y%m%d_%H%M%S"))
+    safe = "_".join(str(part).replace("/", "-").replace(" ", "") for part in parts if part)
+    return f"{safe}.html"
 
 def create_chart(timeframe_data, params):
     """Creates a chart using the provided timeframe data and parameters."""
@@ -899,6 +899,7 @@ def create_chart(timeframe_data, params):
 
 if __name__ == "__main__":
     print_logo()
+    print_viewer_info()
     print("CHART ANALYSE - Heatmap Generator and Strategy Backtester")
     
     # Get user inputs

@@ -1,0 +1,543 @@
+//@version=5
+strategy(title='Damian Murphy ADX RSI DMAC', shorttitle='DMADX', overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=95, initial_capital=10000, commission_value=0.04, max_bars_back=1000)
+
+// ============================================================================
+// DMX - kondensierte Live-Version
+//
+// Hartcodierte Live-Konfiguration:
+//   Long  Entry : nls2
+//   Long  Close : nls2 confirmed
+//   Short Entry : B-Methode 1
+//   Short Close : nls2 confirmed
+//   Filter Long : SMMATrend (up), ATR-Range, Volume
+//   Filter Short: ATR-Range
+//
+// Die Divergenz-Berechnung/-Integration erfolgt extern; erhalten bleibt nur
+// die Divergenz-Profilkonfiguration.
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// Parameter
+// ----------------------------------------------------------------------------
+fromDay   = input.int(defval=31, title='From Day', minval=1, maxval=31)
+fromMonth = input.int(defval=12, title='From Month', minval=1, maxval=12)
+fromYear  = input.int(defval=2018, title='From Year', minval=2000)
+toDay     = input.int(defval=31, title='To Day', minval=31, maxval=31)
+toMonth   = input.int(defval=12, title='To Month', minval=12, maxval=12)
+toYear    = input.int(defval=2050, title='To Year', minval=2050)
+
+startDate  = timestamp(fromYear, fromMonth, fromDay, 00, 00)
+finishDate = timestamp(toYear, toMonth, toDay, 00, 00)
+time_cond  = time >= startDate and time <= finishDate
+
+length_mult = input.float(1, step=0.1)
+
+// SMA / SMMA
+lenSMALong      = math.round(input.int(185, minval=1, title='Length SMA Long')  * length_mult)
+lenSMAShort     = math.round(input.int(160, minval=1, title='Length SMA Short') * length_mult)
+lenSlowSMAShort = math.round(input.int(500, minval=1, title='Length SMA Slow')  * length_mult)
+
+// AMA
+lengthAMA     = input(title="AMA Length", defval=84)
+fastLengthAMA = input(title="AMA Fast EMA Length", defval=12)
+slowLengthAMA = input(title="AMA Slow EMA Length", defval=180)
+
+// Bollinger Bands
+length      = math.round(input.int(20, minval=1, title='Length BB Long')  * length_mult)
+lengthShort = math.round(input.int(19, minval=1, title='Length BB Short') * length_mult)
+multLong    = input.float(2,   minval=0.001, maxval=50, step=0.1, title='StdDev Long')
+multShort   = input.float(1.9, minval=0.001, maxval=50, step=0.1, title='StdDev Short')
+
+// SMA-Perioden (nls2 / Volume)
+sma_veryfast_length = math.round(input(10)  * length_mult)
+sma_mid_length      = math.round(input(50)  * length_mult)
+sma_slow_length     = math.round(input(100) * length_mult)
+sma_veryslow_length = math.round(input(200) * length_mult)
+
+// Volatilitäts-Level (VLI)
+VLI_fast_length = math.round(input(200)  * length_mult)
+VLI_slow_length = math.round(input(1000) * length_mult)
+VLI_top_length  = math.round(input(1000) * length_mult)
+
+// ATR Ranging Filter
+atrRangeAtrLength     = input.int(18, group='ATR Ranging', minval=2, title='ATR length')
+atrRangeHmaModeSwitch = input.string('TEHMA', group='ATR Ranging', title='HMA variation', options=['-', 'HMA', 'EHMA', 'TEHMA'])
+atrRangeHmaLength     = input.int(200, group='ATR Ranging', minval=2, step=5, title='HMA length')
+
+// LinReg Channel (Short B-Methode 1)
+len_lr = input.int(defval=120, title='Length LR', minval=10, group="Additional")
+
+// Stop Loss / Soft Close
+stopLossMultLong             = input.float(0.95, minval=0.0, step=0.01,  title='Stop Loss Mult Long')
+stopLossMultShort            = input.float(1.02, minval=0.0, step=0.001, title='Stop Loss Mult Short')
+softCloseTradeAgeInBarsLong  = input(50, title='Soft Close Bars Long')
+softCloseTradeAgeInBarsShort = input(50, title='Soft Close Bars Short')
+
+// ----------------------------------------------------------------------------
+// Divergenz-Profilkonfiguration (externe Integration)
+// ----------------------------------------------------------------------------
+divergencesShortEntryProfileIndicators = array.new_string()
+divergencesShortEntryProfilePivotPeriod = 3
+divergencesShortEntryProfileLimit = 2
+divergencesShortEntryProfileMinPriceChange = 1
+array.push(divergencesShortEntryProfileIndicators, "adp")
+array.push(divergencesShortEntryProfileIndicators, "diosc")
+array.push(divergencesShortEntryProfileIndicators, "vwmacd")
+array.push(divergencesShortEntryProfileIndicators, "mfi")
+
+divergencesShortExitProfileIndicators = array.new_string()
+divergencesShortExitProfilePivotPeriod = 3
+divergencesShortExitProfileLimit = 2
+divergencesShortExitProfileMinPriceChange = 2
+array.push(divergencesShortExitProfileIndicators, "diosc")
+array.push(divergencesShortExitProfileIndicators, "adp")
+array.push(divergencesShortExitProfileIndicators, "mom")
+array.push(divergencesShortExitProfileIndicators, "rsi")
+
+divergencesLongEntryProfileIndicators = array.new_string()
+divergencesLongEntryProfilePivotPeriod = 5
+divergencesLongEntryProfileLimit = 2
+divergencesLongEntryProfileMinPriceChange = 3
+array.push(divergencesLongEntryProfileIndicators, "adp")
+array.push(divergencesLongEntryProfileIndicators, "diosc")
+array.push(divergencesLongEntryProfileIndicators, "rsi")
+array.push(divergencesLongEntryProfileIndicators, "mom")
+
+divergencesLongExitProfileIndicators = array.new_string()
+divergencesLongExitProfilePivotPeriod = 5
+divergencesLongExitProfileLimit = 3
+divergencesLongExitProfileMinPriceChange = 3
+array.push(divergencesLongExitProfileIndicators, "adp")
+array.push(divergencesLongExitProfileIndicators, "diosc")
+array.push(divergencesLongExitProfileIndicators, "rsi")
+array.push(divergencesLongExitProfileIndicators, "vwmacd")
+array.push(divergencesLongExitProfileIndicators, "cci")
+array.push(divergencesLongExitProfileIndicators, "mom")
+
+// ----------------------------------------------------------------------------
+// Hilfsfunktionen
+// ----------------------------------------------------------------------------
+returnOccuranceOfCondition(comparisonValueType, historicalValue, operator, comparisonValue, lookback) =>
+    int countOccurances = 0
+    for i = 1 to lookback
+        if (comparisonValueType == "int" or comparisonValueType == "float")
+            if operator == ">" and historicalValue[i] > comparisonValue[i]
+                countOccurances += 1
+            if operator == "<" and historicalValue[i] < comparisonValue[i]
+                countOccurances += 1
+            if operator == "<=" and historicalValue[i] <= comparisonValue[i]
+                countOccurances += 1
+            if operator == ">=" and historicalValue[i] >= comparisonValue[i]
+                countOccurances += 1
+            if operator == "==" and historicalValue[i] == comparisonValue[i]
+                countOccurances += 1
+            if operator == "!=" and historicalValue[i] != comparisonValue[i]
+                countOccurances += 1
+    countOccurances
+
+returnDistanceToConditionBool(historicalValue, operator, comparisonValue, lookback) =>
+    distance = 0
+    for i = 1 to lookback
+        distance := i
+        if operator == "==" and historicalValue[i] == comparisonValue
+            break
+        if operator == "!=" and historicalValue[i] != comparisonValue
+            break
+    distance
+
+returnOccuranceOfConditionBool(comparisonValueType, historicalValue, operator, comparisonValue, lookback) =>
+    int countOccurances = 0
+    for i = 1 to lookback
+        if operator == "==" and historicalValue[i] == comparisonValue
+            countOccurances += 1
+        if operator == "!=" and historicalValue[i] != comparisonValue
+            countOccurances += 1
+    countOccurances
+
+returnOccuranceOfConditionString(comparisonValueType, historicalValue, operator, comparisonValue, lookback) =>
+    int countOccurances = 0
+    for i = 1 to lookback
+        if operator == "==" and historicalValue[i] == comparisonValue
+            countOccurances += 1
+        if operator == "!=" and historicalValue[i] != comparisonValue
+            countOccurances += 1
+    countOccurances
+
+confirmedBBBreakout(direction, band) =>
+    confirmed = false
+    if direction == "bot" and close[1] < band[1] and close < band
+        confirmed := true
+    if direction == "top" and close[1] > band[1] and close > band
+        confirmed := true
+    confirmed
+
+getSmmaTrend(srcSMA, lenSMA, maMethod, ama) =>
+    smma = 0.0
+    smmaTrend = 'no_trend'
+    if (maMethod == "smma")
+        smma := na(smma[1]) ? ta.ema(srcSMA, lenSMA) : (smma[1] * (lenSMA - 1) + srcSMA) / lenSMA
+    else if (maMethod == "sma")
+        smma := ta.sma(srcSMA, lenSMA)
+    else if (maMethod == "ema")
+        smma := ta.ema(srcSMA, lenSMA)
+    else if (maMethod == "vwma")
+        smma := ta.vwma(srcSMA, lenSMA)
+    else if (maMethod == "ama")
+        smma := ama
+    smmaDifference = smma[1] - smma
+    if smmaDifference > 0
+        smmaTrend := 'down'
+    else
+        smmaTrend := 'up'
+    [smma, smmaTrend]
+
+// Hull Moving Average (für ATR Ranging)
+HMA(_src, _length)  => ta.wma(2 * ta.wma(_src, _length / 2) - ta.wma(_src, _length), math.round(math.sqrt(_length)))
+EHMA(_src, _length) => ta.ema(2 * ta.ema(_src, _length / 2) - ta.ema(_src, _length), math.round(math.sqrt(_length)))
+THMA(_src, _length) => ta.wma(3 * ta.wma(_src, _length / 3) - ta.wma(_src, _length / 2) - ta.wma(_src, _length), _length)
+
+HullMode(modeSwitch, src, len) =>
+    modeSwitch == 'HMA'   ? HMA(src, len) :
+    modeSwitch == 'EHMA'  ? EHMA(src, len) :
+    modeSwitch == 'TEHMA' ? THMA(src, len / 2) : na
+
+get_channel(src_lr, len_lr) =>
+    mid = math.sum(src_lr, len_lr) / len_lr
+    slope = ta.linreg(src_lr, len_lr, 0) - ta.linreg(src_lr, len_lr, 1)
+    intercept = mid - slope * math.floor(len_lr / 2) + (1 - len_lr % 2) / 2 * slope
+    endy = intercept + slope * (len_lr - 1)
+    dev = 0.0
+    for x = 0 to len_lr - 1 by 1
+        dev += math.pow(src_lr[x] - (slope * (len_lr - x) + intercept), 2)
+    dev := math.sqrt(dev / len_lr)
+    [intercept, endy, dev, slope]
+
+// ----------------------------------------------------------------------------
+// Indikatoren
+// ----------------------------------------------------------------------------
+// AMA (für SMMA Short)
+fastAlpha = 2 / (fastLengthAMA + 1)
+slowAlpha = 2 / (slowLengthAMA + 1)
+hh_ama = ta.highest(lengthAMA + 1)
+ll_ama = ta.lowest(lengthAMA + 1)
+mltp = hh_ama - ll_ama != 0 ? math.abs(2 * close - ll_ama - hh_ama) / (hh_ama - ll_ama) : 0
+ssc = mltp * (fastAlpha - slowAlpha) + slowAlpha
+ama = 0.0
+ama := nz(ama[1]) + math.pow(ssc, 2) * (close - nz(ama[1]))
+
+// SMMA / SMMA Short / Slow SMMA
+[smma, smmaTrend]          = getSmmaTrend(close, lenSMALong, "vwma", ama)
+[smmaShort, smmaTrendShort] = getSmmaTrend(close, lenSMAShort, "ama", ama)
+[slowSmma, slowSmmaTrend]   = getSmmaTrend(close, lenSlowSMAShort, "smma", ama)
+
+// Bollinger Bands
+bollinger_basis       = ta.sma(close, length)
+bollinger_basis_short = ta.sma(close, lengthShort)
+devLong               = multLong * ta.stdev(close, length)
+bollinger_top         = bollinger_basis + devLong
+bollinger_bot         = bollinger_basis - devLong
+devShort              = multShort * ta.stdev(close, lengthShort)
+bollinger_top_short   = bollinger_basis_short + devShort
+bollinger_bot_short   = bollinger_basis_short - devShort
+
+// SMA (nls2 / Volume)
+sma_veryfast = ta.sma(close, sma_veryfast_length)
+sma_mid      = ta.sma(close, sma_mid_length)
+sma_slow     = ta.sma(close, sma_slow_length)
+sma_veryslow = ta.sma(close, sma_veryslow_length)
+
+// BBW / VLI
+bbw       = ta.bbw(close, length, multLong)
+bbw_short = ta.bbw(close, lengthShort, multLong)
+VLI_fast  = ta.sma(bbw, VLI_fast_length)
+VLI_slow  = ta.sma(bbw, VLI_slow_length)
+VLI_top   = ta.sma(bbw, VLI_top_length) + (2 * ta.stdev(bbw, VLI_top_length))
+
+low_volatility_level = VLI_fast < VLI_slow
+extreme_volatility   = bbw > VLI_top
+vol_condition        = ta.sma(volume, sma_veryfast_length) > ta.sma(volume, sma_mid_length)
+
+// ATR Ranging Filter
+atrRangeAtr  = HullMode(atrRangeHmaModeSwitch, ta.tr, atrRangeAtrLength)
+atrRangeMa   = HullMode(atrRangeHmaModeSwitch, atrRangeAtr, atrRangeHmaLength)
+atrRangeCond = atrRangeHmaModeSwitch != "-" and atrRangeMa > atrRangeAtr
+
+// LinReg Channel
+[y1_, y2_, dev, slope] = get_channel(close, len_lr)
+upper_linreg = y2_ + 2 * dev
+lower_linreg = y2_ - 2 * dev
+
+// MTF DI (für adx-di-cross Close-Signale)
+trVal  = math.max(high - low, math.abs(high - close[1]), math.abs(low - close[1]))
+up     = ta.change(high)
+down   = -ta.change(low)
+len240 = 56
+len480 = 112
+trur240       = ta.rma(trVal, len240)
+DIP240        = 100 * ta.rma(up, len240) / trur240
+DIN240        = 100 * ta.rma(down, len240) / trur240
+trur480       = ta.rma(trVal, len480)
+DIPlusIntval  = 100 * ta.rma(up, len480) / trur480
+DIMinusIntval = 100 * ta.rma(down, len480) / trur480
+
+// ----------------------------------------------------------------------------
+// State / Variablen
+// ----------------------------------------------------------------------------
+varip tradeType = string(na)
+
+varip entryPriceLong = 0.0
+varip stopLossPriceLong = 0.0
+varip tradeMethodLong = 'none'
+varip tradeMethodLongTightOrBroad = 'none'
+varip tradeAgeLong = 0
+
+varip entryPriceShort = 0.0
+varip stopLossPriceShort = 0.0
+varip tradeMethodShort = 'none'
+varip tradeAgeShort = 0
+
+executingTradeLong  = false
+executingTradeShort = false
+
+varip resultingStopPriceLong = 0.0
+resultingStopPriceShort = 0.0
+
+longEntry       = false
+longClose       = false
+longCloseReason = ""
+shortEntry       = false
+shortClose       = false
+shortCloseReason = ""
+
+varip squeeze_started = false
+lowBBWPhase = false
+varip distanceToStartOfSqueeze = int(na)
+distanceToStartOfLowBBPhase = 0
+squeezeStartInsideLowBBWPhase = false
+higherSqueezeZone = float(na)
+lowerSqueezeZone = float(na)
+channelSize = float(na)
+
+initialStopLossPriceLong  = stopLossPriceLong
+initialStopLossPriceShort = stopLossPriceShort
+
+checkForSqueezeZone(price) =>
+    priceInSqueezeZone = false
+    if (price < higherSqueezeZone and price > lowerSqueezeZone)
+        priceInSqueezeZone := true
+    priceInSqueezeZone
+
+// ----------------------------------------------------------------------------
+// Squeeze-Zonen (Vorbereitung)
+// ----------------------------------------------------------------------------
+if bbw_short <= ta.lowest(bbw_short, 96)
+    squeeze_started := true
+
+lowBBWPhase := returnOccuranceOfCondition("float", bbw_short, "<", VLI_slow, 20) > 15 and returnOccuranceOfCondition("float", bbw_short, "<", VLI_fast, 20) > 15
+
+distanceToStartOfLowBBPhase := returnDistanceToConditionBool(lowBBWPhase, "==", 0, 500)
+distanceToStartOfSqueeze    := returnDistanceToConditionBool(squeeze_started, "==", 1, 500)
+squeezeStartInsideLowBBWPhase := (distanceToStartOfLowBBPhase * 2) > distanceToStartOfSqueeze
+
+realBBW = bollinger_top_short - bollinger_bot_short
+channelSize := ta.sma(realBBW, 50) / 2.5
+higherSqueezeZone := close[distanceToStartOfSqueeze] + channelSize
+lowerSqueezeZone  := close[distanceToStartOfSqueeze] - channelSize
+
+// ----------------------------------------------------------------------------
+// Signal-Generierung und Ausführung
+// ----------------------------------------------------------------------------
+if time_cond
+
+    // ========================================================================
+    // Entry-Signale
+    // ========================================================================
+
+    // Short Entry: B-Methode 1
+    shortSignalB1 = not extreme_volatility and returnOccuranceOfConditionString("string", slowSmmaTrend, "==", "down", 2) > 1 and confirmedBBBreakout('bot', bollinger_bot_short) and close < lower_linreg and (checkForSqueezeZone(close[1]) or checkForSqueezeZone(high[1]) or checkForSqueezeZone(low[1]) or checkForSqueezeZone(close[2]) or checkForSqueezeZone(close[3]) or checkForSqueezeZone(close[4]) or checkForSqueezeZone(close[5]) or checkForSqueezeZone(close[6]) or checkForSqueezeZone(close[7]) or (returnOccuranceOfConditionBool('bool', lowBBWPhase, "==", 1, 10) > 0 and returnOccuranceOfConditionBool('bool', squeezeStartInsideLowBBWPhase, "==", 1, 10) > 0))
+    if shortSignalB1
+        squeeze_started := false
+
+    // Long Entry: nls2
+    longNls2      = false
+    longNls2Kind  = ""
+    if (close > bollinger_top and close > upper_linreg and VLI_top != 0)
+        if (close > sma_mid)
+            if (bbw < VLI_top)
+                if (low_volatility_level)
+                    if (sma_mid > sma_veryslow)
+                        longNls2 := true
+                        longNls2Kind := "broad1"
+                else if (sma_mid > sma_slow)
+                    longNls2 := true
+                    longNls2Kind := "broad1"
+        else if (sma_mid > sma_veryslow)
+            longNls2 := true
+            longNls2Kind := "tight"
+
+    // Long B-Methode 1 (kein Entry in der Live-Config, setzt aber squeeze_started zurück)
+    longSignalB1 = returnOccuranceOfConditionString("string", slowSmmaTrend, "==", "up", 2) > 1 and confirmedBBBreakout('top', bollinger_top) and (checkForSqueezeZone(close[1]) or checkForSqueezeZone(high[1]) or checkForSqueezeZone(low[1]) or checkForSqueezeZone(close[2]) or checkForSqueezeZone(close[3]) or checkForSqueezeZone(close[4]) or checkForSqueezeZone(close[5]) or checkForSqueezeZone(close[6]) or checkForSqueezeZone(close[7]) or (returnOccuranceOfConditionBool('bool', lowBBWPhase, "==", 1, 10) > 0 and returnOccuranceOfConditionBool('bool', squeezeStartInsideLowBBWPhase, "==", 1, 10) > 0))
+    if longSignalB1
+        squeeze_started := false
+
+    // ========================================================================
+    // Close-Signale
+    // ========================================================================
+
+    // Short Close: nls2 confirmed
+    shortCloseNls2Confirmed = confirmedBBBreakout('top', bollinger_top) and vol_condition
+    shortCloseAdxDi         = returnOccuranceOfCondition("float", DIP240, "<", DIN240, 12) > 11 and DIP240 > DIN240
+
+    // Long Close: nls2 confirmed
+    longCloseNls2Confirmed = confirmedBBBreakout('bot', bollinger_bot) and vol_condition
+    longCloseAdxDi         = returnOccuranceOfCondition("float", DIPlusIntval, ">", DIMinusIntval, 24) > 22 and DIPlusIntval < DIMinusIntval
+    longCloseBreakout      = returnOccuranceOfCondition("float", close, ">", bollinger_basis, 24) > 22 and ta.crossunder(close, bollinger_basis)
+
+    // ========================================================================
+    // Entry-Ausführung
+    // ========================================================================
+
+    // Short: B-Methode 1, Filter = ATR-Range
+    if not atrRangeCond and shortSignalB1
+        shortEntry := true
+        stopLossPriceShort := close * stopLossMultShort
+        tradeMethodShort := "B-Methode 1"
+        tradeType := "short"
+
+    // Long: nls2, Filter = SMMATrend up, ATR-Range, Volume
+    if returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 2) > 1 and not atrRangeCond and vol_condition and longNls2
+        longEntry := true
+        stopLossPriceLong := close * stopLossMultLong
+        tradeMethodLong := "nls2"
+        tradeType := "long"
+
+    // ========================================================================
+    // Close-Ausführung
+    // ========================================================================
+
+    // Long Close: nls2 confirmed (Soft Close)
+    if tradeMethodLong == "nls2" and tradeType == "long"
+        softCloseOk = (stopLossPriceLong < entryPriceLong and close < entryPriceLong) or tradeAgeLong < softCloseTradeAgeInBarsLong
+        if softCloseOk and longCloseNls2Confirmed
+            longCloseReason := "nls2 confirmed"
+            longClose := true
+
+    // Short Close: nls2 confirmed (immer aktiv)
+    if tradeMethodShort == "B-Methode 1" and tradeType == "short" and not shortEntry
+        if shortCloseNls2Confirmed
+            shortCloseReason := "nls2 confirmed"
+            shortClose := true
+
+    // Custom Closes
+    if tradeType == "short" and shortCloseAdxDi
+        shortCloseReason := "adx-di/4w"
+        shortClose := true
+
+    if tradeType == "short" and close < entryPriceShort * 0.98 and tradeAgeShort > 48 and returnOccuranceOfConditionString("string", smmaTrendShort, "==", "down", 48) > 46 and smmaTrendShort == "up"
+        shortCloseReason := "smma trend"
+        shortClose := true
+
+    if tradeType == "long" and longCloseAdxDi
+        longCloseReason := "adx-di-cross"
+        longClose := true
+
+    if tradeType == "long" and tradeAgeLong > 48 and returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 48) > 46 and smmaTrend == "down"
+        longCloseReason := "smma trend"
+        longClose := true
+
+    if tradeAgeLong > 23 and tradeType == "long" and longCloseBreakout and tradeMethodLongTightOrBroad == "tight"
+        longCloseReason := "breakout"
+        longClose := true
+
+    // ========================================================================
+    // Trade-Ausführung
+    // ========================================================================
+
+    // Long
+    if longEntry
+
+        if tradeMethodLong[1] != "none"
+
+            if tradeMethodLong[1] == tradeMethodLong and tradeType[1] == tradeType
+                if tradeType == "long"
+                    stopLossPriceLong := initialStopLossPriceLong
+            else
+                tradeType := tradeType[1]
+                stopLossPriceLong := initialStopLossPriceLong
+                tradeMethodLong := tradeMethodLong[1]
+
+        else
+
+            tradeMethodLongTightOrBroad := longNls2Kind
+            if entryPriceLong == 0.0
+                entryPriceLong := close
+            strategy.entry("long", strategy.long, comment = longNls2Kind + " " + tradeType)
+            stopLossPriceLong := math.max(stopLossPriceLong, stopLossPriceLong[1])
+            executingTradeLong := true
+
+    if longClose
+        strategy.close("long", comment = longCloseReason + " " + tradeType + " close")
+
+    if strategy.position_size == 0 and not executingTradeLong
+        tradeMethodLong := "none"
+        tradeMethodLongTightOrBroad := "none"
+        stopLossPriceLong := 0.0
+        entryPriceLong := 0.0
+        tradeAgeLong := 0
+        resultingStopPriceLong := 0.0
+
+    if strategy.position_size != 0 or longEntry
+        tradeAgeLong += 1
+
+        if not longEntry and tradeType == "long"
+            stopLossPriceLong := initialStopLossPriceLong
+
+        if stopLossPriceLong > 0
+            resultingStopPriceLong := stopLossPriceLong
+
+        strategy.exit('tp/sl exit', 'long', stop=resultingStopPriceLong)
+
+    // Short
+    if shortEntry
+
+        if tradeMethodShort[1] != "none"
+
+            if tradeMethodShort[1] == tradeMethodShort and tradeType[1] == tradeType
+                if tradeType == "short"
+                    stopLossPriceShort := initialStopLossPriceShort
+            else
+                tradeType := tradeType[1]
+                stopLossPriceShort := initialStopLossPriceShort
+                tradeMethodShort := tradeMethodShort[1]
+
+        else
+
+            strategy.entry('short', strategy.short, comment = tradeMethodShort + " " + tradeType)
+            if entryPriceShort == 0.0
+                entryPriceShort := close
+            executingTradeShort := true
+
+    if shortClose
+        strategy.close('short', comment = shortCloseReason + " " + tradeType + " close")
+
+    if strategy.position_size >= 0.00 and not executingTradeShort
+        tradeMethodShort := "none"
+        stopLossPriceShort := 0.0
+        entryPriceShort := 0.0
+        tradeAgeShort := 0
+
+    if strategy.position_size < 0 or shortEntry
+        tradeAgeShort += 1
+
+        if not shortEntry and tradeType == "short"
+            stopLossPriceShort := initialStopLossPriceShort
+
+        resultingStopPriceShort := stopLossPriceShort > 0 ? stopLossPriceShort : na
+
+        strategy.exit('tp/sl short', 'short', stop=resultingStopPriceShort)
+
+    // ========================================================================
+    // Nachbereitung
+    // ========================================================================
+    if tradeMethodLong == "none" and tradeMethodShort == "none"
+        tradeType := na

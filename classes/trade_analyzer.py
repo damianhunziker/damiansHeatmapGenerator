@@ -99,6 +99,11 @@ class TradeAnalyzer:
                 if should_close:
                     exit_time = current_time
                     exit_price = float(current_price)
+                    # Optionaler strategie-spezifischer Exit-Preis (z.B. Stop-Loss-Level)
+                    if 'exit_price' in data.columns:
+                        custom_exit_price = data['exit_price'].iloc[i]
+                        if pd.notna(custom_exit_price):
+                            exit_price = float(custom_exit_price)
                     
                     contracts = position_size / entry_price
                     price_change = exit_price - entry_price if current_direction == "LONG" else entry_price - exit_price
