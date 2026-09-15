@@ -24,7 +24,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DEFAULT_PORT = int(os.environ.get("HEATMAP_VIEWER_PORT", "8900"))
 PUBLIC_HOST = os.environ.get("HEATMAP_VIEWER_HOST", "localhost")

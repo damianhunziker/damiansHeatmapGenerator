@@ -91,10 +91,10 @@ class TradeAnalyzer:
                 # Check for regular exit signals
                 elif current_direction == "LONG" and data['long_exit'].iloc[i]:
                     should_close = True
-                    exit_reason = data['exit_reason'].iloc[i]
+                    exit_reason = data['exit_reason'].iloc[i] if 'exit_reason' in data.columns else 'Exit signal'
                 elif current_direction == "SHORT" and data['short_exit'].iloc[i]:
                     should_close = True
-                    exit_reason = data['exit_reason'].iloc[i]
+                    exit_reason = data['exit_reason'].iloc[i] if 'exit_reason' in data.columns else 'Exit signal'
                 
                 if should_close:
                     exit_time = current_time

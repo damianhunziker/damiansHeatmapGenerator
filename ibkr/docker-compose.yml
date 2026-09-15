@@ -1,0 +1,38 @@
+name: ibkr-gateway
+
+# Headless Interactive Brokers Gateway (IBC + Xvfb), controlled by env vars.
+# Only reachable from this machine: every port is bound to 127.0.0.1.
+# Docs: https://github.com/gnzsnz/ib-gateway-docker
+services:
+  ib-gateway:
+    image: gnzsnz/ib-gateway:stable
+    container_name: ibkr-gateway
+    restart: unless-stopped
+    environment:
+      TWS_USERID: ${TWS_USERID}
+      TWS_PASSWORD_FILE: /run/secrets/tws_password
+      TRADING_MODE: ${TRADING_MODE:-paper}
+      # Safety: set to "yes" once you no longer place orders through the API.
+      READ_ONLY_API: ${READ_ONLY_API:-no}
+      TWS_ACCEPT_INCOMING: ${TWS_ACCEPT_INCOMING:-accept}
+      # 2FA: restart (instead of exit) so the container survives a missed push.
+      TWOFA_TIMEOUT_ACTION: ${TWOFA_TIMEOUT_ACTION:-restart}
+      RELOGIN_AFTER_TWOFA_TIMEOUT: ${RELOGIN_AFTER_TWOFA_TIMEOUT:-yes}
+      # Confirm 2FA in IBKR Mobile within this many seconds of startup.
+      TWOFA_EXIT_INTERVAL: ${TWOFA_EXIT_INTERVAL:-180}
+      BYPASS_WARNING: ${BYPASS_WARNING:-yes}
+      AUTO_RESTART_TIME: ${AUTO_RESTART_TIME:-11:59 PM}
+      EXISTING_SESSION_DETECTED_ACTION: ${EXISTING_SESSION_DETECTED_ACTION:-primary}
+      ALLOW_BLIND_TRADING: ${ALLOW_BLIND_TRADING:-no}
+      JAVA_HEAP_SIZE: ${JAVA_HEAP_SIZE:-1024}
+      TIME_ZONE: ${TIME_ZONE:-Europe/Zurich}
+      TZ: ${TIME_ZONE:-Europe/Zurich}
+      # Set a password to enable the local VNC console (debugging / 2FA).
+      VNC_SERVER_PASSWORD: ${VNC_SERVER_PASSWORD:-}
+    ports:
+      - "127.0.0.1:4001:4003"   # live  TWS API
+      - "127.0.0.1:4002:4004"   # paper TWS API
+      # - "127.0.0.1:5900:5900" # VNC, only if VNC_SERVER_PASSWORD is set
+    volumes:
+      - ./tws_settings:/home/ibgateway/tws_settings
+      - ./secrets:/run/secrets:ro

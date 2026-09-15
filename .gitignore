@@ -12,4 +12,8 @@ classes/indicators/*
 /live_strategies/
 /test/
 .docker-data/
+.env
+ibkr/tws_settings/
+ibkr/secrets/
+series_cache/
 

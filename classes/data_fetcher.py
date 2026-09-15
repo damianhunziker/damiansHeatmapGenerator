@@ -13,6 +13,16 @@ class OHLCFetcher:
 
     def fetch_data(self, asset, interval, start_date=None, limit=100000):
         """Fetches OHLC data from Binance API or cache"""
+        upper = str(asset).upper()
+        if upper.startswith(("IBKR_", "IBKR:")):
+            from classes.ibkr_fetcher import IBKRFetcher
+            return IBKRFetcher().fetch_data(asset, interval, limit=limit)
+        if upper.startswith("IBK"):
+            raise ValueError(
+                f"Unbekanntes IBKR-Prefix in '{asset}'. Erwartet 'IBKR_<SYMBOL>' "
+                f"(z.B. IBKR_SPY, IBKR_AAPL, IBKR_SPX, IBKR_ES, IBKR_GC)."
+            )
+
         cache_file = self._get_cache_filename(asset, interval)
         
         # Check cache first

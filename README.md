@@ -273,7 +273,7 @@ Generated artifacts:
 | Component | Role |
 |-----------|------|
 | `chart_analysis.py` | `create_interactive_chart()` builds and shows the figure; `create_chart()` helper; interactive `__main__` |
-| `strategy_utils.py` | `get_user_inputs()`, `get_strategy_inputs()`, `get_available_strategies()`, `fetch_data()` |
+| `core/strategy_utils.py` | `get_user_inputs()`, `get_strategy_inputs()`, `get_available_strategies()`, `fetch_data()` |
 | `classes/trade_analyzer.py` | `TradeAnalyzer.analyze_data()` / `_generate_trades()` — signal replay, trade simulation, fees, exit reasons |
 | `classes/base_strategy.py` | `BaseStrategy` contract (`get_parameters`, `prepare_signals`, …) |
 | `classes/strategies/*_strategy.py` | concrete strategy; provides `prepare_signals()`, `add_strategy_traces()`, `get_parameters()`, `get_required_timeframes()` |
@@ -290,6 +290,152 @@ python chart_analysis.py
 python test.py chart_analysis --start_date="2024-01-01" --end_date="2024-03-01" \
     --asset="BTCUSDT" --strategy="LiveKAMASSLStrategy" --interval="4h"
 ```
+
+## Machine-readable API (`--api`)
+
+Every tool can be run as a JSON API by adding `--api` to any `test.py` call.
+With `--api` the process writes **exactly one JSON object to stdout** (all
+normal console output is redirected to stderr), so it can be consumed by
+scripts, agents and MCP servers.
+
+```bash
+python test.py pnl --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
+    --start_date=2024-01-01 --end_date=2024-03-01 --api
+```
+
+The response is always wrapped in the same envelope:
+
+```json
+{
+  "ok": true,
+  "tool": "pnl",
+  "params": { "...": "..." },
+  "data": { "...": "..." },
+  "artifacts": [{"path": "/app/html_cache/results.html",
+                 "url": "http://localhost:8900/html_cache/results.html"}],
+  "warnings": [],
+  "error": null,
+  "duration_ms": 3719
+}
+```
+
+Schema (tools, strategy parameters, parameter ranges, intervals):
+
+```bash
+python test.py --schema --api
+```
+
+### Tools and their `data` payload
+
+| Tool | `data` contents |
+|------|-----------------|
+| `pnl` | `directions.{both,long,short}` with `metrics`, `trades`, `equity_curve`, `equity_curve_timestamps`, `pnl_performance`, `buy_hold`, `drawdown` |
+| `chart_analysis` | `summary` (equity, return, win rate, …), `trades`, `divergence_indicators` |
+| `heatmap` | `grid` (one entry per parameter combination), `best` (top-N by profit/net_profit/sharpe/drawdown), `robustness` (3×3 neighbourhood mean/min), `param_ranges`, `x_param`, `y_param` |
+| `automator` | `output_dir`, `runs[]` (per pair: `ok`, `error`, `best`, `grid`, `artifact`) |
+| `fetcher` | `asset`, `interval`, `rows`, `start`, `end`, `cache_path` |
+| `series` | per-candle indicator/signal series (see below) |
+
+Heatmap parameter grids are passed as JSON. A grid of `0.7..0.9` (step `0.1`)
+× `1.0..1.1` (step `0.1`) with PnL images disabled:
+
+```bash
+python test.py heatmap --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
+    --start_date=2024-01-01 --end_date=2024-03-01 --no_images --workers=1 \
+    '--param_ranges={"entry_filter":{"min":0.7,"max":0.9,"step":0.1},"exit_filter":{"min":1.0,"max":1.1,"step":0.1}}' \
+    --api
+```
+
+`--no_images` skips the per-cell PnL PNG generation (much faster, ideal for
+agents). `--workers N` controls the multiprocessing pool (`--workers 1` runs
+serially). `--max_combos` (default `400`) guards against accidental huge grids.
+
+### Choosing heatmap parameters (free selection)
+
+The swept parameters are **passed at call time** via `--param_ranges` / the
+`param_ranges` argument — they are **not hardcoded**. Any keyword argument the
+strategy constructor accepts can be swept; the strategy's
+`get_parameter_ranges()` is only the default when `param_ranges` is omitted.
+
+Each value may be a list of explicit values, or a spec:
+
+| Form | Example |
+|------|---------|
+| list of values (numeric, categorical or boolean) | `{"hma_mode": ["VWMA","HMA"], "use_fusion_for_long": [true,false]}` |
+| `{min, max, step}` | `{"entry_filter": {"min":0.5,"max":1.5,"step":0.25}}` |
+| `{min, max, count}` | `{"entry_filter": {"min":0.5,"max":1.5,"count":5}}` |
+
+Constraints to keep in mind:
+
+- **Exactly 2 parameters.** The heatmap is 2D: the first two keys become the x/y
+  axes (`x_param`, `y_param`). One parameter raises an error; three or more are
+  computed but only the first two are visualised, so the `robustness` pivot
+  becomes ambiguous. Pass exactly two.
+- **Unknown names are silently dropped.** The strategy is instantiated with only
+  the kwargs it accepts, so a typo makes that axis constant (all cells
+  identical) instead of raising. Sanity-check the grid: if `x`/`y` (or the
+  metric column) has a single distinct value, the parameter was not applied.
+- **Categorical / boolean** values work as lists; the axis number formatting is
+  cosmetic only.
+- **The human CLI (`test.py heatmap` without `--api`) ignores `--param_ranges`**
+  and always uses `strategy_class.get_parameter_ranges()`. Free selection is
+  available via `--api` and the MCP tool.
+
+The result contains `grid` (all combinations with metrics), `best` (top-N by
+profit / net_profit / sharpe / drawdown) and `robustness` (3×3 neighbourhood
+`neighbor_mean` / `neighbor_min`). Prefer **plateaus** over spikes: a stable
+cell has a small `|profit − neighbor_mean|` and a `neighbor_min` not far below
+`profit`. Confirm the plateau on a different date range and across pairs with
+`automator`.
+
+### Runtime debugging with `series`
+
+`series` returns per-candle indicator and signal columns so a model can answer
+"why did this trade / no trade happen?". Small results are returned inline;
+large results are written to a Parquet file (falls back to CSV if `pyarrow` is
+missing) and only the path is returned — query it with DuckDB.
+
+```bash
+python test.py series --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
+    --start_date=2024-01-01 --end_date=2024-02-01 \
+    --columns price_close,long_entry,short_entry,long_exit,short_exit,exit_reason \
+    --tail 500 --api
+```
+
+Options: `--columns a,b,c`, `--tail N`, `--format json|parquet`,
+`--inline_max_cells N` (default `5000`).
+
+## MCP server
+
+`mcp_server/server.py` exposes the API over the Model Context Protocol (stdio).
+It calls `python test.py <tool> ... --api` as a subprocess (keeping the MCP
+stdout channel clean) and returns the JSON envelope. It opens no network ports.
+
+Tools: `get_schema`, `fetch_data`, `run_pnl`, `run_chart_analysis`,
+`run_heatmap`, `run_automator`, `get_series`, `run_tool`, `list_artifacts`,
+`read_artifact`.
+
+Because the strategy dependencies (TA-Lib, ccxt, ib_async) live in the Docker
+image, run the server inside the `app` container:
+
+```bash
+docker exec -i damians-heatmap-dev python mcp_server/server.py
+```
+
+An MCP client (e.g. `opencode.json`) is configured as:
+
+```json
+"damians-heatmap": {
+  "type": "local",
+  "command": ["docker", "exec", "-i", "damians-heatmap-dev", "python", "mcp_server/server.py"],
+  "enabled": true,
+  "timeout": 600000,
+  "autoApprove": ["get_schema", "fetch_data", "run_pnl", "run_chart_analysis", "get_series", "list_artifacts", "read_artifact"]
+}
+```
+
+Environment overrides: `HEATMAP_PROJECT_ROOT`, `HEATMAP_PYTHON`,
+`HEATMAP_MCP_TIMEOUT` (subprocess timeout in seconds, default `1500`).
 
 ## Contributing
 
@@ -313,7 +459,7 @@ This script provides a unified interface to run various trading strategy tools w
 2. **heatmap.py** - Generates heatmaps for strategy parameter optimization
 3. **chart_analysis.py** - Analyzes and visualizes trading charts
 4. **pnl.py** - Calculates and visualizes PnL
-5. **fetcher.py** - Fetches market data
+5. **core/fetcher.py** - Fetches market data
 
 ## Usage
 

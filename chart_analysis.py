@@ -3,8 +3,8 @@ import sys
 import os
 import pandas as pd
 from datetime import datetime
-from strategy_utils import print_logo, get_user_inputs, get_strategy_inputs, fetch_data, get_available_strategies
-from html_viewer import publish_figure, print_viewer_info
+from core.strategy_utils import print_logo, get_user_inputs, get_strategy_inputs, fetch_data, get_available_strategies, instantiate_strategy
+from core.html_viewer import publish_figure, print_viewer_info
 from classes.trade_analyzer import TradeAnalyzer
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
@@ -15,7 +15,7 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     """Creates an interactive Plotly chart with price movement and PnL curve"""
     print("\n=== Debug: Strategy Initialization ===")
     # Initialize strategy with timeframe data
-    strategy = strategy_class(**strategy_params)
+    strategy = instantiate_strategy(strategy_class, strategy_params)
     strategy.timeframe_data = timeframe_data  # Add timeframe data to strategy
     print(f"Strategy class: {strategy.__class__.__name__}")
     print(f"Strategy params: {strategy_params}")
@@ -47,14 +47,17 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     print("\n=== Trade Statistics ===")
     print(f"Total number of trades: {len(trades)}")
     
+    initial_equity = strategy_params.get('initial_equity', 10000)
+    current_equity = initial_equity
+    winning_trades = 0
+    total_profit = 0
+    total_fees = 0
+    completed_trades = 0
+    win_rate = 0.0
+    total_return = 0.0
+    avg_trade_profit = 0.0
+
     if len(trades) > 0:
-        # Calculate basic metrics
-        initial_equity = strategy_params.get('initial_equity', 10000)
-        current_equity = initial_equity
-        winning_trades = 0
-        total_profit = 0
-        total_fees = 0
-        
         print("\nTrade List:")
         print("=" * 140)
         print(f"{'#':3} | {'Type':<6} | {'Entry Time':<19} | {'Exit Time':<19} | {'Entry':<10} | {'Exit':<10} | "
@@ -109,6 +112,18 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
         print(f"Average Profit per Trade: ${(total_profit/completed_trades):,.2f}" if completed_trades > 0 else "No completed trades")
     else:
         print("\nNo trades found in the analyzed period.")
+
+    avg_trade_profit = (total_profit / completed_trades) if completed_trades > 0 else 0.0
+    summary = {
+        'initial_equity': initial_equity,
+        'final_equity': current_equity,
+        'total_return_pct': total_return,
+        'total_profit': total_profit,
+        'total_fees': total_fees,
+        'num_trades': completed_trades,
+        'win_rate': win_rate,
+        'avg_trade_profit': avg_trade_profit,
+    }
     
     # --- Divergence subplot logic ---
     # Collect all divergence indicators from both regular and short divergence results
@@ -524,6 +539,27 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
                 line=line_style
             ), row=subplot_row, col=1)
 
+        # Optional background shading for signal regions (e.g. squeeze recog signals)
+        for bg_spec in subplot.get('backgrounds', []):
+            column = bg_spec.get('column')
+            if column not in display_data.columns:
+                continue
+            mask = display_data[column].fillna(0).astype(bool).values
+            color = bg_spec.get('color', 'rgba(255, 215, 0, 0.25)')
+            opacity = bg_spec.get('opacity', 0.25)
+            x = display_data.index
+            start = None
+            for j, flag in enumerate(mask):
+                if flag and start is None:
+                    start = x[j]
+                elif not flag and start is not None:
+                    fig.add_vrect(x0=start, x1=x[j], fillcolor=color, opacity=opacity,
+                                  line_width=0, layer='below', row=subplot_row, col=1)
+                    start = None
+            if start is not None:
+                fig.add_vrect(x0=start, x1=x[-1], fillcolor=color, opacity=opacity,
+                              line_width=0, layer='below', row=subplot_row, col=1)
+
     print("\nAdding divergence indicator traces...")
     # --- Add divergence indicator subplots ---
     for idx, indicator in enumerate(divergence_indicators):
@@ -846,7 +882,15 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     chart_path = os.path.join("html_cache", _chart_filename(strategy, strategy_params))
     publish_figure(fig, chart_path, label="Chart Analysis")
 
-    return fig
+    # Structured result for the machine-readable API (see core/api.py)
+    return {
+        'figure': fig,
+        'summary': summary,
+        'trades': trades,
+        'display_data': display_data,
+        'divergence_indicators': divergence_indicators,
+        'artifact': chart_path,
+    }
 
 def _chart_filename(strategy, strategy_params):
     """Build a descriptive, stable file name for the chart analysis output."""

@@ -1,10 +1,10 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from strategy_utils import get_user_inputs, fetch_data, get_strategy_inputs, print_logo, create_performance_chart
+from core.strategy_utils import get_user_inputs, fetch_data, get_strategy_inputs, print_logo, create_performance_chart, instantiate_strategy
 from classes.data_fetcher import OHLCFetcher
 import numpy as np
 from classes.trade_analyzer import TradeAnalyzer
-from html_viewer import publish_file, print_viewer_info
+from core.html_viewer import publish_file, print_viewer_info
 import os
 import pandas as pd
 
@@ -15,7 +15,7 @@ def analyze_direction(timeframe_data, strategy_class, strategy_params, direction
     direction_params['trade_direction'] = direction
     
     # Initialize strategy
-    strategy = strategy_class(**direction_params)
+    strategy = instantiate_strategy(strategy_class, direction_params)
     strategy.timeframe_data = timeframe_data
     
     # Ensure the strategy's divergence detector has the date range
@@ -711,6 +711,17 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
         print(f"Short Only: {len([t for t in results_short['trades'] if t[4] is not None])} trades, Net P/L: ${results_short['metrics']['total_net_profit']:.2f}")
     
     publish_file("html_cache/results.html", label="PnL Analysis - Results")
+
+    # Structured result for the machine-readable API (see core/api.py)
+    return {
+        'directions': {
+            'both': results_both,
+            'long': results_long,
+            'short': results_short,
+        },
+        'selected_direction': selected_direction,
+        'artifact': 'html_cache/results.html',
+    }
 
 if __name__ == "__main__":
     print_logo()

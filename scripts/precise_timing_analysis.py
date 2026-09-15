@@ -1,9 +1,13 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
-import os
 
 def load_tv_trades():
     """Load TradingView trades from CSV with precise timestamp analysis"""
@@ -60,7 +64,7 @@ def get_python_trades_actual():
     
     try:
         # Import required modules
-        from strategy_utils import fetch_data, get_available_strategies
+        from core.strategy_utils import fetch_data, get_available_strategies
         from classes.trade_analyzer import TradeAnalyzer
         import pandas as pd
         import os

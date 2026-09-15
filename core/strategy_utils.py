@@ -64,6 +64,29 @@ def get_strategy_inputs(strategy_class):
         params[param_name] = type(default_value)(value)  # Convert to correct data type
     return params
 
+def instantiate_strategy(strategy_class, params):
+    """Instantiate a strategy, dropping params its __init__ does not accept.
+
+    Strategies differ in which keyword arguments they accept (some only take
+    their own indicator parameters and no ``start_date``/``asset``).  This
+    helper keeps the full parameter dict available for the TradeAnalyzer while
+    only forwarding what the concrete constructor can handle.
+    """
+    try:
+        signature = inspect.signature(strategy_class.__init__)
+    except (TypeError, ValueError):
+        return strategy_class(**params)
+
+    accepts_var_kwargs = any(
+        param.kind == inspect.Parameter.VAR_KEYWORD
+        for param in signature.parameters.values()
+    )
+    if accepts_var_kwargs:
+        return strategy_class(**params)
+
+    accepted = {key: value for key, value in params.items() if key in signature.parameters}
+    return strategy_class(**accepted)
+
 def print_logo():
     print("""
 

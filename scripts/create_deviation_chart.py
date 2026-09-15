@@ -1,9 +1,14 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
-from html_viewer import publish_figure
+from core.html_viewer import publish_figure
 
 def load_tv_trades():
     """Load TradingView trades from CSV"""

@@ -1,8 +1,13 @@
-from strategy_utils import print_logo, fetch_data, get_trading_pairs
+import os
+import sys
+
+if __package__ in (None, ""):
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.strategy_utils import print_logo, fetch_data, get_trading_pairs
 from classes.data_fetcher import OHLCFetcher
 import pandas as pd
 from tqdm import tqdm
-import os
 
 def fetch_all_data(interval, higher_tf):
     """Fetch data for all trading pairs"""

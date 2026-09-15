@@ -14,3 +14,6 @@ TA-Lib>=0.4.28
 ccxt>=4.0.0
 mplfinance>=0.12.10b0
 seaborn>=0.13.0
+ib_async>=2.0.0
+mcp>=1.0.0
+pyarrow>=14.0.0

@@ -5,11 +5,12 @@ import json
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import os
-from strategy_utils import get_available_strategies
+from core.strategy_utils import get_available_strategies, fetch_data
 import pandas as pd
 import numpy as np
-from classes.strategies.live_kama_ssl_strategy import LiveKAMASSLStrategy
-import yfinance as yf
+
+# Heavy strategy/optional imports are done lazily inside the functions that
+# need them so that `--api` (and `--schema --api`) stay fast and quiet.
 
 def get_class_init_params(module_name: str, class_name: str) -> Dict[str, Any]:
     """Get initialization parameters for a class from a module."""
@@ -372,6 +373,8 @@ def print_schema() -> None:
             print(f"- {param_name} ({required}{default}){description}")
 
 def test_fusion_range_filter():
+    from classes.strategies.live_kama_ssl_strategy import LiveKAMASSLStrategy
+
     print("\n=== Starting Fusion Range Filter Test ===")
     print("="*50)
     
@@ -485,42 +488,103 @@ def test_fusion_range_filter():
     print("\nTest completed!")
     print("="*50)
 
+def _coerce_value(key: str, value: str) -> Any:
+    """Coerce a raw CLI string into the type the API expects."""
+    if not isinstance(value, str):
+        return value
+    lowered = value.strip().lower()
+    if lowered == 'true':
+        return True
+    if lowered == 'false':
+        return False
+    if value and value[0] in '{[':
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
+    if key in ('pairs', 'columns'):
+        return [part.strip() for part in value.replace(',', ' ').split() if part.strip()]
+    try:
+        if value.replace('.', '', 1).replace('-', '', 1).isdigit():
+            return float(value) if '.' in value else int(value)
+    except ValueError:
+        pass
+    return value
+
+
+def parse_cli_params(args: List[str]) -> Dict[str, Any]:
+    """Parse ``--key=value``, ``--key value`` and boolean ``--flag`` arguments."""
+    params: Dict[str, Any] = {}
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if not arg.startswith('--'):
+            i += 1
+            continue
+        body = arg[2:]
+        if '=' in body:
+            key, value = body.split('=', 1)
+        else:
+            key = body
+            if i + 1 < len(args) and not args[i + 1].startswith('--'):
+                value = args[i + 1]
+                i += 1
+            else:
+                value = True
+        params[key] = _coerce_value(key, value)
+        i += 1
+    return params
+
+
+def _run_api(exec_name: str, args: List[str], schema: bool = False) -> int:
+    """Machine-readable entry point: print exactly one JSON object to stdout."""
+    from core import api
+
+    if schema:
+        payload = {"ok": True, "tool": "schema", "data": api.get_schema()}
+        print(json.dumps(payload, ensure_ascii=False))
+        return 0
+
+    params = parse_cli_params(args)
+    options = {}
+    envelope = api.run_tool(exec_name, params, options)
+    print(api.dumps(envelope))
+    return 0 if envelope.get("ok") else 1
+
+
 def main():
     """Main function to handle command line arguments."""
-    if len(sys.argv) < 2 or sys.argv[1] in ['-h', '--help']:
+    argv = sys.argv[1:]
+    use_api = '--api' in argv
+    if use_api:
+        argv = [a for a in argv if a != '--api']
+
+    if not argv or argv[0] in ['-h', '--help']:
         print("\nUsage:")
         print("  python test.py <executable> [parameters]")
-        print("  python test.py --schema")
+        print("  python test.py <executable> [parameters] --api     (JSON output)")
+        print("  python test.py --schema [--api]")
         print("\nExecutables:")
-        print("  automator, heatmap, chart_analysis, pnl, fetcher")
+        print("  automator, heatmap, chart_analysis, pnl, fetcher, series")
         print("\nExample:")
         print('  python test.py pnl --start_date="2024-01-01" --end_date="2024-03-01" --asset="BTCUSDT" --strategy="LiveKAMASSLStrategy"')
+        print('  python test.py pnl --start_date="2024-01-01" --end_date="2024-03-01" --asset="BTCUSDT" --strategy="LiveKAMASSLStrategy" --api')
         return
-    
-    if sys.argv[1] == '--schema':
+
+    if argv[0] == '--schema':
+        if use_api:
+            sys.exit(_run_api('schema', [], schema=True))
         print_schema()
         return
-    
-    exec_name = sys.argv[1]
-    
-    # Parse parameters from command line
-    params = {}
-    for arg in sys.argv[2:]:
-        if arg.startswith('--'):
-            key_value = arg[2:].split('=', 1)
-            if len(key_value) == 2:
-                key, value = key_value
-                # Handle boolean values
-                if value.lower() == 'true':
-                    value = True
-                elif value.lower() == 'false':
-                    value = False
-                # Handle numeric values
-                elif value.replace('.', '').isdigit():
-                    value = float(value) if '.' in value else int(value)
-                params[key] = value
-    
+
+    exec_name = argv[0]
+
+    if use_api:
+        sys.exit(_run_api(exec_name, argv[1:]))
+
+    params = parse_cli_params(argv[1:])
     run_executable(exec_name, params)
+
 
 if __name__ == "__main__":
     main()
