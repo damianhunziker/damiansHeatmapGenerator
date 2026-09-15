@@ -1,0 +1,3708 @@
+  //@version=5
+// from 2435 
+// from changes_configuration 10.3.22 original nls2, stabiles short v10
+strategy(title='Damian Murphy ADX RSI DMAC', shorttitle='DMADX', overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=95, initial_capital=10000, commission_value=0.04, max_bars_back=1000, max_lines_count=400, max_labels_count=400 )
+ 
+// Funktionen
+//--------------- 
+
+use_remote_date = false
+
+remote_ticker = input.symbol("", "Symbol")
+
+var resulting_close = 0.0
+var resulting_open = 0.0
+var resulting_high = 0.0 
+var resulting_low = 0.0
+var resulting_volume = 0.0 
+
+remote_close = request.security(remote_ticker, "60", close)
+remote_open = request.security(remote_ticker, "60", open)
+remote_high = request.security(remote_ticker, "60", high)
+remote_low = request.security(remote_ticker, "60", low)
+remote_volume = request.security(remote_ticker, "60", volume)
+
+if remote_ticker != "" and use_remote_date
+    resulting_close := remote_close
+    resulting_open := remote_open
+    resulting_high := remote_high
+    resulting_low := remote_low
+    resulting_volume := remote_volume
+else
+    resulting_close := close
+    resulting_open := open
+    resulting_high := high
+    resulting_low := low
+    resulting_volume := volume
+   
+//plot(resulting_open, title="resulting_open") 
+//plot(resulting_high, title="resulting_high")
+//plot(resulting_low, title="resulting_low")
+//plot(resulting_close, title="resulting_close")
+//plot(resulting_volume, title="resulting_volume")
+
+getSmmaTrend(srcSMA, lenSMA, maMethod, ama, colorDown, colorUp) =>
+
+    smma = 0.0
+    smmaTrendColor = color.black
+    smmaTrend = 'no_trend'
+
+    if (maMethod == "smma")
+        smma := na(smma[1]) ? ta.ema(srcSMA, lenSMA) : (smma[1] * (lenSMA - 1) + srcSMA) / lenSMA
+    else if (maMethod == "sma")
+        smma := ta.sma(srcSMA, lenSMA)
+    else if (maMethod == "ema")
+        smma := ta.ema(srcSMA, lenSMA)
+    else if (maMethod == "vwma")
+        smma := ta.vwma(srcSMA, lenSMA)
+    else if (maMethod == "ama")    
+        smma := ama
+    
+    smmaDifference = smma[1] - smma
+    
+    if smmaDifference > 0
+        smmaTrend := 'down'
+        smmaTrendColor := colorDown
+        smmaTrendColor
+    else
+        smmaTrend := 'up'
+        smmaTrendColor := colorUp
+        smmaTrendColor
+        
+    [smma, smmaTrend, smmaTrendColor]
+
+dirmov(len) => 
+	up = ta.change(resulting_high)
+	down = -ta.change(resulting_low)
+	plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+	minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+	truerange = ta.rma(ta.tr, len)
+	plus = fixnan(100 * ta.rma(plusDM, len) / truerange)
+	minus = fixnan(100 * ta.rma(minusDM, len) / truerange)
+	[plus, minus]
+adx(dilen, adxlen) =>
+	[plus, minus] = dirmov(dilen)
+	sum = plus + minus
+	adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+
+array_includes(array, needle) => 
+    array.includes(array, needle) 
+
+returnOccuranceOfCondition(comparisonValueType, historicalValue, operator, comparisonValue, lookback) =>
+    int countOccurances = 0
+    for i = 1 to lookback
+        //if (comparisonValueType == "bool" or comparisonValueType == "string")  
+        //    if operator == "==" and historicalValue[i] == comparisonValue
+        //        countOccurances += 1
+        //    if operator == "!=" and historicalValue[i] != comparisonValue
+        //        countOccurances += 1
+                
+        if (comparisonValueType == "int" or comparisonValueType == "float") 
+            if operator == ">" and historicalValue[i] > comparisonValue[i]
+                countOccurances += 1
+            if operator == "<" and historicalValue[i] < comparisonValue[i]
+                countOccurances += 1
+            if operator == "<=" and historicalValue[i] <= comparisonValue[i]
+                countOccurances += 1
+            if operator == ">=" and historicalValue[i] >= comparisonValue[i]
+                countOccurances += 1
+            if operator == "==" and historicalValue[i] == comparisonValue[i]
+                countOccurances += 1
+            if operator == "!=" and historicalValue[i] != comparisonValue[i]
+                countOccurances += 1
+    countOccurances 
+    
+returnDistanceToConditionInt(historicalValue, operator, comparisonValue, lookback) =>
+    distance = 0
+    for i = 1 to lookback
+        distance = i
+        
+        if operator == ">" and historicalValue[i] > comparisonValue[i]
+            break
+        if operator == "<" and historicalValue[i] < comparisonValue[i]
+            break
+        if operator == "<=" and historicalValue[i] <= comparisonValue[i]
+            break
+        if operator == ">=" and historicalValue[i] >= comparisonValue[i]
+            break
+        if operator == "==" and historicalValue[i] == comparisonValue[i]
+            break
+        if operator == "!=" and historicalValue[i] != comparisonValue[i]
+            break
+                
+    distance 
+    
+returnDistanceToConditionBool(historicalValue, operator, comparisonValue, lookback) =>
+    distance = 0
+    for i = 1 to lookback
+        distance := i
+        
+        if operator == "==" and historicalValue[i] == comparisonValue
+            break
+        if operator == "!=" and historicalValue[i] != comparisonValue
+            break
+                
+    distance 
+
+returnOccuranceOfConditionBool(comparisonValueType, historicalValue, operator, comparisonValue, lookback) =>
+    int countOccurances = 0
+    for i = 1 to lookback
+        if operator == "==" and historicalValue[i] == comparisonValue
+            countOccurances += 1
+        if operator == "!=" and historicalValue[i] != comparisonValue
+            countOccurances += 1
+    countOccurances
+
+returnOccuranceOfConditionString(comparisonValueType, historicalValue, operator, comparisonValue, lookback) =>
+    int countOccurances = 0
+    for i = 1 to lookback
+        if operator == "==" and historicalValue[i] == comparisonValue
+            countOccurances += 1
+        if operator == "!=" and historicalValue[i] != comparisonValue
+            countOccurances += 1
+    countOccurances
+    
+confirmedBBBreakout(direction, band) =>
+    confirmed = false
+    if direction == "bot" and resulting_close[1] < band[1] and resulting_close < band 
+        confirmed := true
+    if direction == "top" and resulting_close[1] > band[1] and resulting_close > band
+        confirmed := true
+    confirmed
+   
+// adx functions 
+getAdxTrend(ADX, DIPlusInt, DIMinusInt) => 
+    adx_trend_direction = "neutral"
+    adx_trend_valid = false
+    adx_rising = false
+    adx_rising_color = color.black
+    adx_trend = "neutral"
+    adx_color = color.black
+    
+    if (ta.crossover(ADX, 20))
+        adx_trend_valid := true
+        
+    if (ADX < 20)
+        adx_trend_valid := false
+    
+    if (ta.crossunder(ADX, 40))
+        adx_trend_valid := false
+        
+    if (ADX > 40)
+        adx_trend_valid := true
+        
+    if (DIPlusInt > DIMinusInt)
+        adx_trend_direction := "long"
+    else
+        adx_trend_direction := "short"
+    
+    if (ta.rising(ADX, 1))
+        adx_rising := true
+        adx_rising_color := color.green
+    else
+        adx_rising := false
+        adx_rising_color := color.white
+    
+    if (adx_rising)// and ADX < 50)
+        if (adx_trend_direction == "long")
+            adx_color := color.green
+            adx_trend := "kaufen"
+        if (adx_trend_direction == "short")
+            adx_color := color.red  
+            adx_trend := "verkaufen"
+    else
+        adx_trend := "seitwaerts"
+        adx_color := color.yellow
+        
+    [adx_trend, adx_color]
+    
+intval = input('600', 'Resolution (1, 5, 60, 240, D, W, M... etc)')
+useChartInt = input(false, 'Use Chart Interval Instead?')
+
+diLen = input.int(14, 'DI Length', minval=1)
+diSmooth = input.int(1, 'DI Smoothing (Zero-Lag, 1 = off)', minval=1)
+adxLen = input.int(14, 'ADX Smoothing (SMA)', minval=1)
+thresh = input.int(25, 'ADX Threshold', minval=0)
+showHist = input(true, 'DI Histogram')
+showSquare = input(false, 'Show Square Wave')
+diThresh1 = input.int(10, 'DI+/DI- Threshold 1', minval=0)
+diThresh2 = input.int(30, 'DI+/DI- Threshold 2', minval=0)
+useHeikin = input(false, 'Heikin-Ashi Mode')
+diRangeLen = input.int(21, 'DI Histogram Range Lookback', minval=1)
+showDIRange = input(false, 'Show DI Range?')
+
+zeroLag(s, len) =>
+    ema1 = ta.ema(s, len)
+    ema2 = ta.ema(ema1, len)
+    d = 2 * ema1 - ema2
+    d
+
+// All calculations for DI+, DI-, ADX will be the live values
+// when the chart interval <= desired interval. When the
+// desired interval < chart interval, extra data is packed
+// into the bars between the desired interval close times.
+// The returned plots show the intermediate values while the
+// chart interval has not yet reached the end of the desired
+// interval close candle.
+
+// The close candle on the desired interval that matches the 
+// same time on the chart interval will yield the same plot
+// values as if the the chart interval and desired interval
+// are the same. For example, set the desired interval to 
+// 60, and let the chart interval be 15. The values on the chart
+// at 0:45, 1:45, 2:45, 3:45, etc will be the same as if the
+// chart interval was switched to 60 while keeping the desired
+// interval at 60. However, all values at 0:00, 0:15, 0:30, 1:00,
+// 1:15, 1:30, etc. will show intermediate calculations while
+// the chart interval is in between successive desired interval
+// close times.
+
+getVars(newSession) =>
+    hh = resulting_high
+    hh := newSession ? resulting_high : math.max(nz(hh[1]), resulting_high)
+    ll = resulting_low
+    ll := newSession ? resulting_low : math.min(nz(ll[1]), resulting_low)
+
+    oo = nz(ta.valuewhen(newSession, resulting_open, 0))
+
+    pc = nz(ta.valuewhen(newSession, resulting_close[1], 0))
+    ph = nz(ta.valuewhen(newSession, hh[1], 0))
+    pl = nz(ta.valuewhen(newSession, ll[1], 0))
+
+    xClose = (oo + hh + ll + resulting_close) / 4
+    pxc = nz(ta.valuewhen(newSession, nz(xClose[1]), 0))
+
+    pxo = nz(ta.valuewhen(newSession, nz(oo[1]), 0))
+    xOpen = (pxo + pxc) / 2
+
+    xHigh = math.max(hh, math.max(xOpen, xClose))
+    xLow = math.min(ll, math.min(xOpen, xClose))
+
+    pxh = nz(ta.valuewhen(newSession, nz(xHigh[1]), 0))
+    pxl = nz(ta.valuewhen(newSession, nz(xLow[1]), 0))
+
+    v1 = math.abs(xHigh - pxc)
+    v2 = math.abs(xLow - pxc)
+    v3 = xHigh - xLow
+
+    tr1 = math.max(v1, math.max(v2, v3))
+
+    v11 = math.abs(hh - pc)
+    v22 = math.abs(ll - pc)
+    v33 = hh - ll
+
+    tr2 = math.max(v11, math.max(v22, v33))
+
+    trueRange = useHeikin ? tr1 : tr2
+
+    hR = useHeikin ? xHigh - pxh : hh - ph
+    lR = useHeikin ? pxl - xLow : pl - ll
+
+    dmPos = hR > lR ? math.max(hR, 0) : 0
+    dmNeg = lR > hR ? math.max(lR, 0) : 0
+
+    sTR = 0.0
+    pstr = nz(ta.valuewhen(newSession, nz(sTR[1]), 0))
+    sTR := pstr - pstr / diLen + trueRange
+
+    sDMPos = 0.0
+    psdmpos = nz(ta.valuewhen(newSession, nz(sDMPos[1]), 0))
+    sDMPos := psdmpos - psdmpos / diLen + dmPos
+
+    sDMNeg = 0.0
+    psdmneg = nz(ta.valuewhen(newSession, nz(sDMNeg[1]), 0))
+    sDMNeg := psdmneg - psdmneg / diLen + dmNeg
+
+    zeroLag__1 = zeroLag(sDMPos / sTR * 100, diSmooth)
+    DIP = diSmooth > 1 ? zeroLag__1 : sDMPos / sTR * 100
+    zeroLag__2 = zeroLag(sDMNeg / sTR * 100, diSmooth)
+    DIN = diSmooth > 1 ? zeroLag__2 : sDMNeg / sTR * 100
+    DX = math.abs(DIP - DIN) / (DIP + DIN) * 100
+
+    // ADX is a sma(DX, adxLen)
+    // However since the time frame can be higher we must manually
+    // code the successive simple moving average forumula here that
+    // can work when the desired interval > chart interval, or when
+    // the desired interval = chart interval
+
+    oldDX = nz(ta.valuewhen(newSession, nz(DX[1]), adxLen - 1))
+    adx = DX
+    padx = nz(ta.valuewhen(newSession, nz(adx[1]), 0))
+    adx := padx + (DX - oldDX) / adxLen
+
+    hist = DIP - DIN
+    histAbs = math.abs(hist)
+    sign = hist >= 0 ? 1 : -1
+    sw = histAbs > diThresh2 ? sign * 3 : histAbs > diThresh1 ? sign * 2 : sign
+
+    [DIP, DIN, adx, hist, histAbs, sw]
+    
+// eof adx functions 
+
+useAdx = input(false)
+adxMethod = input.string(title="ADX Method", defval="Multi-Timeframe", options = ["Tradingview", "BeikabuOyaji", "Multi-Timeframe"])
+
+useUltras = input(false)
+useLongEntry3 = input(false)
+
+useTrending = input(false, title = "***** TRENDING ***************")
+ 
+useLong = input(true, title = "***** LONG ********************")
+useImmediatelyPlaceOrderLong = input(false)
+useSMMATrendLong = input(true)
+useAtrRangeCondLong = input(true)
+useVolumeCondForLongEntry = input(true)
+useDivergenceCheckLong = input(false)
+useDivergenceCheckToCloseLong = input(false)
+useBBBasisCloseAfterBreakoutLong = input(false)
+periodForDivergenceCheckLong = input(5)
+longMethod = input.string(title="Open Method", defval="nls2", options = ["-", "vwmacd", "Murphy", "nls2", "SAR", "BB gimmee bar", "BB mean reversion", "BB cross mid", "RSI", "RSI and divergences", "RSIdiv adxlong", "MFI", "StochRSI", "StochRSI and CVD", "momentum", "AMA", "4-Wochen-Regel", "div confirmed", "trend-div-breakout", "B-Methode 1"])
+bevaviorAtRepetionLong = input.string(title="bevaviorAtRepetionLong", defval="no action", options = ["Recalculate", "Recalculate Higher Only", "no action"]) 
+longCloseMethod = input.string(title="Close Method", defval="nls2", options = ["-", "vwmacd", "Murphy", "nls2", "SAR", "BB gimmee bar", "BB mean reversion", "BB cross mid", "RSI", "MFI", "StochRSI", "StochRSI and CVD", "momentum", "AMA", "4-Wochen-Regel", "adx-di-cross", "div confirmed", "trend-div-breakout", "B-Methode 1", "nls2 confirmed"])
+useCloseIfAdxTrendChangesLong = input(false)
+useShortEntryAsCloseSignalLong = input(false)
+useTakeProfitLong = input(false)
+takeProfitStartPercLong = input(100000) * 0.01
+trailPercLong = input.float(title='Trail Long Loss (%)', minval=0.0, defval=100000) * 0.01
+useStopLossLong = input(true)
+stopLossMultLong = input.float(0.95, minval=0.0, step=0.01)
+useLongClose = input(false)
+useSoftLongClose = input(true)
+softCloseTradeAgeInBarsLong = input(50)
+
+useShort = input(false, title = "***** SHORT ********************")
+useImmediatelyPlaceOrderShort = input(false)
+useSMMATrendShort = input(false)
+useAtrRangeCondShort = input(true)
+useVolumeCondForShortEntry = input(false)
+useDivergenceCheckShort = input(false)
+useDivergenceCheckToCloseShort = input(false)
+periodForDivergenceCheckShort = input(5)
+//useAdjustStopLossOnRecurringSignalsShort = input(true)
+shortMethod = input.string(title="Open Method", defval="div rebound", options = ["-", "vwmacd", "Murphy", "nls2", "nls2 long mirror", "short 4", "RSI and divergences", "SAR", "ausbruch", "recht gut", "BB mean reversion", "BB gimmee bar", "RSI", "MFI", "momentum", "AMA", "4-Wochen-Regel", "BB DI divergence", "divergence RSI ausbruch", "div rebound", "B-Methode 1", "div confirmed", "div confirmed fast"])
+bevaviorAtRepetionShort = input.string(title="bevaviorAtRepetionShort", defval="no action", options = ["Recalculate", "Recalculate Higher Only", "no action"]) 
+shortCloseMethod = input.string(title="Close Method", defval="div rebound", options = ["-", "vwmacd", "Murphy", "nls2", "short 4", "SAR", "ausbruch", "recht gut", "BB mean reversion", "BB gimmee bar", "RSI", "MFI", "momentum", "AMA", "4-Wochen-Regel", "div rebound", "adx-di-cross", "B-Methode 1", "div confirmed", "div confirmed fast", "nls2 confirmed"])
+useLongEntryAsCloseSignalShort = input(false)
+useTakeProfitShort = input(false)
+useTrailStartPerc = input(false)
+trailStartPercShort = input.float(title='Trail Start Short Loss (%)', minval=0.0, step=0.1, defval=100000)
+trailPercShort = input.float(title='Trail Short Loss (%)', minval=0.0, step=0.1, defval=100000)
+useStopLossShort = input(true)
+stopLossMultShort = input.float(1.02, minval=0.0, step=0.001)
+useShortClose = input(true)
+useSoftShortClose = input(false)
+softCloseTradeAgeInBarsShort = input(50)
+
+useSideways = input(false, title = "***** SIDEWAYS ***************")
+
+useSidewaysLong = input(false, title = "********** SIDEWAYS LONG *****")
+useOverrideADXBehaviorSidewaysLong = input.string(defval="kaufen", options = ["-", "asDerivedFromAdx", "kaufen", "verkaufen", "seitwaerts"])
+useRAVIForEntriesSidewaysLong = input(false)
+useDontOpenIfTheresAShortPositionSidewaysLong = input(false)
+useSMMATrendSidewaysLong = input(false)
+useVolumeCondForSidewaysLongEntry = input(false)
+useDivergenceCheckSidewaysLong = input(false)
+useDivergenceCheckToCloseSidewaysLong = input(false)
+periodForDivergenceCheckSidewaysLong = input(10)
+sidewaysLongMethod = input.string(title="Open Method", defval="trend-div-breakout", options = ["-", "Murphy", "nls2", "SAR", "BB gimmee bar", "BB mean reversion", "BB mean div", "BB cross mid", "RSI", "RSI and divergences", "RSIdiv adxlong", "Sideways RSI", "MFI", "StochRSI", "StochRSI and CVD", "Stochastic", "4-Wochen-Regel", "div confirmed", "trend-div-breakout"])
+bevaviorAtRepetionSidewaysLong = input.string(title="bevaviorAtRepetionSidewaysLong", defval="no action", options = ["Recalculate", "Recalculate Higher Only", "no action"]) 
+sidewaysLongCloseMethod = input.string(title="Close Method", defval="trend-div-breakout", options = ["-", "Murphy", "nls2", "SAR", "BB gimmee bar", "BB mean reversion", "BB cross mid", "RSI", "Sideways RSI", "MFI", "StochRSI", "StochRSI and CVD", "Stochastic", "4-Wochen-Regel", "trend-div-breakout", "div confirmed", "adx-di-cross"])
+useCloseIfAdxTrendChangesSidewaysLong = input(false)
+useTakeProfitSidewaysLong = input(false)
+takeProfitStartPercSidewaysLong = input(100000) * 0.01
+trailPercSidewaysLong = input.float(title='Trail Long Loss (%)', minval=0.0, defval=100000) * 0.01
+useStopLossSidewaysLong = input(true)
+stopLossMultSidewaysLong = input.float(0.95, minval=0.0, step=0.01)
+useSidewaysLongClose = input(false)
+useSoftSidewaysLongClose = input(true)
+softCloseTradeAgeInBarsSidewaysLong = input(30)
+useShortEntryAsCloseSignalSidewaysLong = input(true)
+
+useSidewaysShort = input(false, title = "********** SIDEWAYS SHORT *****")
+useOverrideADXBehaviorSidewaysShort = input.string(defval="-", options = ["-", "asDerivedFromAdx", "kaufen", "verkaufen", "seitwaerts"])
+useRAVIForEntriesSidewaysShort = input(false)
+useDontOpenIfTheresALongPositionSidewaysShort = input(false)
+useSMMATrendSidewaysShort = input(false)
+useVolumeCondForSidewaysShortEntry = input(false)
+useDivergenceCheckSidewaysShort = input(false)
+useDivergenceCheckToCloseSidewaysShort = input(false)
+periodForDivergenceCheckSidewaysShort = input(5)
+sidewaysShortMethod = input.string(title="Open Method", defval="div confirmed", options = ["-", "Murphy", "nls2", "nls2 long mirror", "short 4", "SAR", "ausbruch", "recht gut", "BB mean reversion", "BB gimmee bar", "RSI", "RSI and divergences", "divergence RSI ausbruch", "div rebound", "Sideways RSI", "MFI", "4-Wochen-Regel", "div confirmed", "Squeeze Outbreak"])
+bevaviorAtRepetionSidewaysShort = input.string(title="bevaviorAtRepetionSidewaysShort", defval="no action", options = ["Recalculate", "Recalculate Higher Only", "no action"]) 
+sidewaysShortCloseMethod = input.string(title="Close Method", defval="div confirmed", options = ["-", "Murphy", "nls2", "short 4", "SAR", "ausbruch", "recht gut", "BB mean reversion", "BB gimmee bar", "RSI", "Sideways RSI", "MFI", "4-Wochen-Regel", "div confirmed", "div confirmed fast", "B-Methode 1"])
+useTakeProfitSidewaysShort = input(false)
+trailStartPercSidewaysShort = input.float(title='Trail Start Short Loss (%)', minval=0.0, step=0.1, defval=10000)
+trailPercSidewaysShort = input.float(title='Trail Short Loss (%)', minval=0.0, step=0.1, defval=10000)
+useStopLossSidewaysShort = input(true)
+stopLossMultSidewaysShort = input.float(1.05, minval=0.0, step=0.01)
+useSidewaysShortClose = input(true)
+useSoftSidewaysShortClose = input(false)
+softCloseTradeAgeInBarsSidewaysShort = input(20)
+useLongEntryAsCloseSignalSidewaysShort = input(false)
+
+// breauche die schon früher
+var longCloseSignals = array.new_string(5)
+var longSignals = array.new_string(5)
+
+var shortCloseSignals = array.new_string(5)
+var shortSignals = array.new_string(5) 
+
+// dat
+fromDay = input.int(defval=31, title='From Day', minval=1, maxval=31)
+fromMonth = input.int(defval=12, title='From Month', minval=1, maxval=12)
+fromYear = input.int(defval=2018, title='From Year', minval=2000)
+toDay = input.int(defval=31, title='To Day', minval=31, maxval=31)
+toMonth = input.int(defval=12, title='To Month', minval=12, maxval=12)
+toYear = input.int(defval=2050, title='To Year', minval=2050)
+
+startDate = timestamp(fromYear, fromMonth, fromDay, 00, 00)
+finishDate = timestamp(toYear, toMonth, toDay, 00, 00)
+time_cond = time >= startDate and time <= finishDate
+
+// Initialisierung aller Indikatoren und Skripts
+//---------------
+
+//adx TV und BeikabuOyaji
+
+adxlen = input(20, title="TV ADX Smoothing") //14
+dilen = input(14, title="TV DI Length") // 14
+baikalen = input(14, title="BeikabuOyaji ADX len") //14
+baikath = input(20, title="BeikabuOyaji ADX th") //20
+
+// nls2
+
+length_mult = input.float(1, step=0.1)
+
+sma_veryfast_length = math.round(input(10) * length_mult)
+sma_fast_length = math.round(input(20) * length_mult)
+sma_mid_length = math.round(input(50) * length_mult)
+sma_slow_length = math.round(input(100) * length_mult)
+sma_veryslow_length = math.round(input(200) * length_mult)
+
+VLI_fast_length = math.round(input(200) * length_mult)
+VLI_slow_length = math.round(input(1000) * length_mult)
+VLI_top_length = math.round(input(1000) * length_mult)
+
+LineLengthMult = 10
+LineLength = ta.atr(100) * LineLengthMult 
+
+// AMA everget
+lengthAMA = input(title="AMA Length", defval=84)
+fastLengthAMA = input(title="AMA Fast EMA Length", defval=12)
+slowLengthAMA = input(title="AMA Slow EMA Length", defval=180)
+highlightMovementsAMA = input(title="AMA Highlight Movements ?", defval=true)
+//srcAMA = input(close, title="AMA Source", defval=close)
+srcAMA = resulting_close
+
+fastAlpha = 2 / (fastLengthAMA + 1)
+slowAlpha = 2 / (slowLengthAMA + 1)
+
+hh = ta.highest(lengthAMA + 1)
+ll = ta.lowest(lengthAMA + 1)
+
+mltp = hh - ll != 0 ? math.abs(2 * srcAMA - ll - hh) / (hh - ll) : 0
+
+ssc = mltp * (fastAlpha - slowAlpha) + slowAlpha
+
+ama = 0.0
+ama := nz(ama[1]) + math.pow(ssc, 2) * (srcAMA - nz(ama[1]))
+
+//amaColor = highlightMovementsAMA ? (ama > ama[1] ? color.blue : color.yellow) : #6d1e7f
+
+
+//SMMA
+varip lastsmma = 0.0
+
+srcSMA = resulting_close
+
+lenSMALong = math.round(input.int(185, minval=1, title='Length SMA Long') * length_mult)
+maMethodLong = input.string(title="maMethodLong", defval="vwma", options = ["smma", "sma", "ema", "vwma", "ama"])
+
+lenSMAShort = math.round(input.int(160, minval=1, title='Length SMA Short') * length_mult)
+maMethodShort = input.string(title="maMethodShort", defval="ama", options = ["smma", "sma", "ema", "vwma", "ama"])
+
+lenSlowSMAShort = math.round(input.int(500, minval=1, title='Length SMA Slow') * length_mult)
+slowMaMethodShort = input.string(title="slowMaMethodShort", defval="smma", options = ["smma", "sma", "ema", "vwma", "ama"])
+    
+[smma, smmaTrend, smmaTrendColor] = getSmmaTrend(srcSMA, lenSMALong, maMethodLong, ama, color.orange, color.lime)
+
+[smmaShort, smmaTrendShort, smmaTrendColorShort] = getSmmaTrend(srcSMA, lenSMAShort, maMethodShort, ama, color.red, color.blue)
+
+[slowSmma, slowSmmaTrend, slowSmmaTrendColor] = getSmmaTrend(srcSMA, lenSlowSMAShort, slowMaMethodShort, ama, color.black, color.rgb(180, 180, 180))
+
+//plot(smma, color=smmaTrendColor, title='smma', linewidth=2)
+//plot(smmaShort, color=smmaTrendColorShort, title='smmaShort', linewidth=2)
+//plot(slowSmma, color=slowSmmaTrendColor, title='slowSmma', linewidth=2)
+
+vwma_sm = 0.0
+vwmaTrendColor = color.black
+vwmaTrend = 'no_trend'
+
+vwma_sm := ta.vwma(resulting_close, 168)
+vwmaDifference = vwma_sm[1] - vwma_sm
+
+if vwmaDifference > 0
+    vwmaTrend := 'down'
+    vwmaTrendColor := color.purple
+else
+    vwmaTrend := 'up'
+    vwmaTrendColor := color.yellow
+
+//plot(vwma_sm, color=vwmaTrendColor, title='VWMA', linewidth=2)
+
+// bollinger bands
+length = math.round(input.int(20, minval=1, title='Length BB Long') * length_mult)
+lengthShort = math.round(input.int(19, minval=1, title='Length BB Short') * length_mult)
+//src = input(close, title='Source', title='Source BB')
+src = resulting_close
+multLong = input.float(2, minval=0.001, maxval=50, step=0.1, title='StdDev Long')
+multShort = input.float(1.9, minval=0.001, maxval=50, step=0.1, title='StdDev Short')
+
+bollinger_basis = ta.sma(src, length)
+bollinger_basis_short = ta.sma(src, lengthShort)
+
+devLong = multLong * ta.stdev(src, length)
+bollinger_top = bollinger_basis + devLong
+bollinger_bot = bollinger_basis - devLong
+bbr_long = (src - bollinger_bot)/(bollinger_top - bollinger_bot)
+
+devShort = multShort * ta.stdev(src, lengthShort)
+bollinger_top_short = bollinger_basis_short + devShort
+bollinger_bot_short = bollinger_basis_short - devShort
+bbr_short = (src - bollinger_bot_short)/(bollinger_top_short - bollinger_bot_short)
+
+showOnlyDemoItems = input.bool(false)
+
+offset = input.int(0, 'Offset', minval=-500, maxval=500)
+plot(not showOnlyDemoItems ? bollinger_basis : na, 'Bollinger Basis', color=color.black, offset=offset)
+p1 = plot(not showOnlyDemoItems ? bollinger_top : na, 'Bollinger Upper', color=color.green, offset=offset)
+p2 = plot(not showOnlyDemoItems ? bollinger_bot : na, 'Bollinger Lower', color=color.green, offset=offset)
+
+// macd
+macd_fast_length = input(title='Fast Length', defval=12)
+macd_slow_length = input(title='Slow Length', defval=26)
+//macd_src = input(title='Source', defval=close)
+macd_src = resulting_close
+macd_signal_length = input.int(title='Signal Smoothing', minval=1, maxval=50, defval=9)
+macd_sma_source = input.string(title='Oscillator MA Type', defval='EMA', options=['SMA', 'EMA'])
+macd_sma_signal = input.string(title='Signal Line MA Type', defval='EMA', options=['SMA', 'EMA'])
+// Plot colors
+macd_col_macd = input.color(#2962FF, 'MACD Line  ', group='Color Settings', inline='MACD')
+macd_col_signal = input.color(#FF6D00, 'Signal Line  ', group='Color Settings', inline='Signal')
+macd_col_grow_above = input.color(#26A69A, 'Above   Grow', group='Histogram', inline='Above')
+macd_col_fall_above = input.color(#B2DFDB, 'Fall', group='Histogram', inline='Above')
+macd_col_grow_below = input.color(#FFCDD2, 'Below Grow', group='Histogram', inline='Below')
+macd_col_fall_below = input.color(#FF5252, 'Fall', group='Histogram', inline='Below')
+// Calculating
+fast_ma = macd_sma_source == 'SMA' ? ta.sma(macd_src, macd_fast_length) : ta.ema(macd_src, macd_fast_length)
+slow_ma = macd_sma_source == 'SMA' ? ta.sma(macd_src, macd_slow_length) : ta.ema(macd_src, macd_slow_length)
+macd = fast_ma - slow_ma
+signal = macd_sma_signal == 'SMA' ? ta.sma(macd, macd_signal_length) : ta.ema(macd, macd_signal_length)
+hist = macd - signal
+//plot(hist, title="Histogram", style=plot.style_columns, color=(hist>=0 ? (hist[1] < hist ? macd_col_grow_above : macd_col_fall_above) : (hist[1] < hist ? macd_col_grow_below : macd_col_fall_below)))
+//plot(macd, title="MACD", color=macd_col_macd)
+//plot(signal, title="Signal", color=macd_col_signal)
+
+timeframeMulti = input(96)
+
+// Damian 4-Wochen-Regel nach Murphy
+hh4w = ta.highest(resulting_close, 28)
+ll4w = ta.lowest(resulting_close, 28)
+
+//plot(hh4w, title="hh4w", color=color.green)
+//plot(ll4w, title="ll4w", color=color.red)
+
+//sma veryfast: the fastest SMA with period=10
+sma_veryfast = ta.sma(resulting_close, sma_veryfast_length)
+//sma fast: SMA with period=20
+sma_fast = ta.sma(resulting_close, sma_fast_length)
+//sma mid: SMA with period=50
+sma_mid = ta.sma(resulting_close, sma_mid_length)
+//sma slow: SMA with period=100
+sma_slow = ta.sma(resulting_close, sma_slow_length)
+//sma veryslow: the slowest SMA with period=200
+sma_veryslow = ta.sma(resulting_close, sma_veryslow_length)
+//bbw bbw(close,20,2)
+
+bbw = ta.bbw(close, length, multLong)
+bbw_short = ta.bbw(close, lengthShort, multLong)
+
+//bbw_price = bollinger_top - bollinger_bot
+//VLI fast = SMA(BBW, per=200)
+VLI_fast = ta.sma(bbw, VLI_fast_length)
+//VLI slow = SMA(BBW, per=1000)
+VLI_slow = ta.sma(bbw, VLI_slow_length)
+//VLI top = SMA(BBW, per=1000) + 2STD(BBW, per=1000)
+VLI_top = ta.sma(bbw, VLI_top_length) + (2 * ta.stdev(bbw, VLI_top_length))
+//low volatility level: VLI fast < VLI slow
+extreme_low_volatility_level = false
+if bbw < VLI_fast
+    extreme_low_volatility_level := true
+    extreme_low_volatility_level
+low_volatility_level = false
+if VLI_fast < VLI_slow
+    low_volatility_level := true
+    low_volatility_level
+//high volatility level: VLI fast > VLI slow
+high_volatility_level = false
+if VLI_fast > VLI_slow
+    high_volatility_level := true
+    high_volatility_level
+//extreme volatility: BBW > VLI top
+extreme_volatility = false
+if bbw > VLI_top
+    extreme_volatility := true
+    extreme_volatility
+//vol condition = SMA(volume, per=10) > SMA(volume, per=50) 
+vol_condition = false
+if ta.sma(resulting_volume, sma_veryfast_length) > ta.sma(resulting_volume, sma_mid_length)
+    vol_condition := true
+    vol_condition
+//BBW condition = SMA(BBW, per=10) > SMA(BBW, per=50)
+//bbw_condition = false
+//if ta.sma(bbw, sma_veryfast_length) > ta.sma(bbw, sma_mid_length)
+//    bbw_condition := true
+//    bbw_condition
+//highest highs
+hh20 = ta.highest(20)
+hh10 = ta.highest(10)
+hh5 = ta.highest(5)
+
+DIPlus = float(na)
+DIMinus = float(na)
+ADX = float(na)
+
+DIPlusBaba = float(na)
+DIMinusBaba = float(na)
+ADXBaba = float(na)
+
+// ADX and Di BeikabuOyaji
+TrueRange = math.max(math.max(resulting_high - resulting_low, math.abs(resulting_high - nz(resulting_close[1]))), math.abs(resulting_low - nz(resulting_close[1])))
+DirectionalMovementPlus = resulting_high - nz(resulting_high[1]) > nz(resulting_low[1]) - resulting_low ? math.max(resulting_high - nz(resulting_high[1]), 0) : 0
+DirectionalMovementMinus = nz(resulting_low[1]) - resulting_low > resulting_high - nz(resulting_high[1]) ? math.max(nz(resulting_low[1]) - resulting_low, 0) : 0
+
+//dailyHigh = request.security(syminfo.tickerid, '60', high)
+//dailyLow = request.security(syminfo.tickerid, '60', low)
+//dailyClose = request.security(syminfo.tickerid, '60', close)
+
+//dailyHigh = high
+//dailyLow = low 
+//dailyClose = close
+
+//TrueRange = math.max(math.max(dailyHigh-dailyLow, math.abs(dailyHigh-nz(dailyClose[1]))), math.abs(dailyLow-nz(dailyClose[1])))
+//DirectionalMovementPlus = dailyHigh-nz(dailyHigh[1]) > nz(dailyLow[1])-dailyLow ? math.max(dailyHigh-nz(dailyHigh[1]), 0): 0
+//DirectionalMovementMinus = nz(dailyLow[1])-dailyLow > dailyHigh-nz(dailyHigh[1]) ? math.max(nz(dailyLow[1])-dailyLow, 0): 0
+
+SmoothedTrueRange = 0.0
+SmoothedTrueRange := nz(SmoothedTrueRange[1]) - nz(SmoothedTrueRange[1]) / baikalen + TrueRange
+
+SmoothedDirectionalMovementPlus = 0.0
+SmoothedDirectionalMovementPlus := nz(SmoothedDirectionalMovementPlus[1]) - nz(SmoothedDirectionalMovementPlus[1]) / baikalen + DirectionalMovementPlus
+
+SmoothedDirectionalMovementMinus = 0.0
+SmoothedDirectionalMovementMinus := nz(SmoothedDirectionalMovementMinus[1]) - nz(SmoothedDirectionalMovementMinus[1]) / baikalen + DirectionalMovementMinus
+
+DIPlusBaba := SmoothedDirectionalMovementPlus / SmoothedTrueRange * 100
+DIMinusBaba := SmoothedDirectionalMovementMinus / SmoothedTrueRange * 100
+DX = math.abs(DIPlusBaba - DIMinusBaba) / (DIPlusBaba + DIMinusBaba) * 100
+ADXBaba := ta.sma(DX, baikalen)
+    
+if (adxMethod == "BeikabuOyaji") 
+    ADX := ADXBaba
+    DIPlus := DIPlusBaba
+    DIMinus := DIMinusBaba
+    
+    //plot(DIPlus, color=color.new(color.green, 0), title='DI+')
+    //plot(DIMinus, color=color.new(color.red, 0), title='DI-')
+    //plot(ADX, color=color.new(color.navy, 0), title='ADX')
+    //hline(th, color=color.black)
+
+// ADX Tradingview built-in
+
+if (adxMethod == "Tradingview")
+    sig = adx(dilen, adxlen)
+    //plot(sig, color=color.black, title="ADX")
+    [plus, minus] = dirmov(dilen)
+    //plot(plus, title="plus", color=color.green)
+    //plot(minus, title="minus", color=color.red)
+    ADX := sig
+    DIPlus := plus
+    DIMinus := minus
+    
+// ADX-DI Multi-Timeframe
+
+//start = request.security(syminfo.tickerid, intval, time, lookahead=barmerge.lookahead_off)
+//change_1_adx3 = ta.change(start)
+//newSession = change_1_adx3 or useChartInt ? 1 : 0
+//sinceNew = ta.barssince(newSession)
+//
+//[DIPlusIntval, DIMinusIntval, adx, hist_adx3, histAbs, sw] = getVars(newSession)
+//
+//// get MTF ADX of 240 min
+//start240 = request.security(syminfo.tickerid, "240", time, lookahead=barmerge.lookahead_off)
+//change_1_adx3_240 = ta.change(start240)
+//newSession240 = change_1_adx3_240 or useChartInt ? 1 : 0
+//sinceNew240 = ta.barssince(newSession240)
+//
+//[DIP240, DIN240, adx240, hist_adx3240, histAbs240, sw240] = getVars(newSession240)
+
+len240 = 56
+len480 = 112
+
+varip plus = float(na)
+varip minus = float(na)
+varip ta = float(na)
+
+up = ta.change(high,1)
+down = -ta.change(low,1)
+plusDM = (na(up) ? na : (up > down and up > 0 ? up : 0))
+minusDM = (na(down) ? na : (down > up and down > 0 ? down : 0))
+ta := (math.max(high - low, math.abs(high - close[1]), math.abs(low - close[1])))
+
+trur240 = ta.rma(ta, len240)
+DIP240 = (100 * ta.rma(up, len240) / trur240)
+DIN240 = (100 * ta.rma(down, len240) / trur240)
+
+trur480 = ta.rma(ta, len480)
+DIPlusIntval = (100 * ta.rma(up, len480) / trur480)
+DIMinusIntval = (100 * ta.rma(down, len480) / trur480)
+
+
+
+
+// DGMIB ADX request
+//adxlen := 14
+//dilen := 14
+//timeframe240 = '240'
+//timeframe480 = '480'
+//
+//dirmov2(len) =>
+//	up = ta.change(high)
+//	down = -ta.change(low)
+//	plusDM = na(up) ? na : (up > down and up > 0 ? up : 0)
+//	minusDM = na(down) ? na : (down > up and down > 0 ? down : 0)
+//	truerange = ta.rma(ta.tr, len)
+//	plus = fixnan(100 * ta.rma(plusDM, len) / truerange)
+//	minus = fixnan(100 * ta.rma(minusDM, len) / truerange)
+//	[plus, minus]
+//adx2(dilen, adxlen) =>
+//	[plus, minus] = dirmov2(dilen)
+//	sum = plus + minus
+//	adx = 100 * ta.rma(math.abs(plus - minus) / (sum == 0 ? 1 : sum), adxlen)
+//sig = adx2(dilen, adxlen)
+//[plus, minus] = dirmov2(dilen)
+//
+////sig := request.security(syminfo.tickerid, timeframe240, sig)
+//DIP240 = request.security(syminfo.tickerid, timeframe240, plus)
+//DIN240 = request.security(syminfo.tickerid, timeframe240, minus)
+//
+//DIPlusIntval = request.security(syminfo.tickerid, timeframe480, plus)
+//DIMinusIntval = request.security(syminfo.tickerid, timeframe480, minus)
+//
+//plot(sig, color=color.black, title="ADX")
+//plot(plus, color=color.green, title="plus")
+//plot(minus, color=color.red, title="minus")
+
+
+
+
+
+
+//plot(plus, color=#2962FF, title="+DI")
+//plot(minus, color=#FF6D00, title="-DI")
+
+// get MTF ADX of 480 min
+//start480 = request.security(syminfo.tickerid, "480", time, lookahead=barmerge.lookahead_off)
+//change_1_adx3_480 = ta.change(start480)
+//newSession480 = change_1_adx3_480 or useChartInt ? 1 : 0
+//sinceNew480 = ta.barssince(newSession480)
+
+//[DIP480, DIN480, adx480, hist_adx3480, histAbs480, sw480] = getVars(newSession480)
+
+//hDI = ta.highest(hist_adx3, diRangeLen)
+//lDI = ta.lowest(hist_adx3, diRangeLen)
+//mid = (hDI + lDI) / 2
+
+//plot(DIP, title='DI+', color=color.new(color.lime, 0))
+//plot(DIN, title='DI-', color=color.new(color.red, 0))
+//plot(adx, title='ADX', color=color.new(color.black, 0))
+
+//color_1 = histAbs > diThresh2 ? #FFFFFFEE : histAbs > diThresh1 ? DIP >= DIN ? #00CCFFEE : #FF00FFEE : DIP >= DIN ? #00FF00EE : #FF0000EE
+
+//plot(showHist ? hist : na, title='DI Histogram', color=color_1, style=plot.style_histogram, linewidth=4)
+//plot(showSquare ? sw : na, title='DI Histogram Square Wave', color=color_1, style=plot.style_histogram, linewidth=4)
+
+//plot(showDIRange ? hDI : na, title='DI Histogram Range High', color=#00FFFF66)
+//plot(showDIRange ? lDI : na, title='DI Histogram Range Low', color=#00FFFF66)
+//plot(showDIRange ? mid : na, title='DI Histogram Range Mid', color=#FFA50066)
+
+//hline(thresh, title='ADX Threshold', color=#FFFF00BB, linestyle=hline.style_dashed)
+
+if (adxMethod == "Multi-Timeframe")
+    //ADX := ta.sma(adx,24)
+    DIPlus := DIPlusIntval
+    DIMinus := DIMinusIntval
+    
+
+    
+
+    
+//[adx_trend, adx_color] = getAdxTrend(ADX, DIPlus, DIMinus)
+//
+//[adx_trend_mtf, adx_color_mtf] = getAdxTrend(adx, DIPlusIntval, DIMinusIntval)
+//
+//[adx_trend_baba, adx_color_baba] = getAdxTrend(ADXBaba, DIPlusBaba, DIMinusBaba)
+
+//adx_trend = "neutral"
+//adx_color = color.white
+
+//if adx_trend_mtf == "kaufen" or adx_trend_baba == "kaufen"
+//    adx_trend := "kaufen"
+//    adx_color := color.green
+    
+//if adx_trend_mtf == "verkaufen" or adx_trend_baba == "verkaufen"
+//    adx_trend := "verkaufen"
+//    adx_color := color.red
+
+//multi_adx_sideways = false
+//if (adx_trend == "neutral" or adx_trend == "seitwaerts") and (adx_trend_baba == "neutral" or adx_trend_baba == "seitwaerts")
+//    multi_adx_sideways := true
+
+
+smaDmacFast = ta.vwma(resulting_close, 20)
+smaDmacMid = ta.vwma(resulting_close, 100)
+smaDmacSlow = ta.vwma(resulting_close, 400)
+    
+// ***************************************************************************************************
+//
+//
+// CREDITS
+//
+//
+// ***************************************************************************************************
+
+// Hull Suite by InSilico
+// Average True Range by S6thSense
+
+// ***************************************************************************************************
+//
+//
+// TYPE
+//
+//
+// ***************************************************************************************************
+
+// ***************************************************************************************************
+//
+//
+// FUNCTIONS
+//
+//
+// ***************************************************************************************************
+
+// https://alanhull.com/hull-moving-average
+//     Hull Moving Average (HMA) formula
+//     Integer(SquareRoot(Period)) WMA [2 x Integer(Period/2) WMA(Price) - Period WMA(Price)]
+// THMA is even more weighted to shorter timeframes than the EMA. The 'T' is for Tripple and is like a Tripple EMA
+// so TEHMA would be more correct.
+HMA (_src, _length) => ta.wma(2 * ta.wma(_src, _length / 2) - ta.wma(_src, _length    ), math.round(math.sqrt(_length)))
+EHMA(_src, _length) => ta.ema(2 * ta.ema(_src, _length / 2) - ta.ema(_src, _length    ), math.round(math.sqrt(_length)))
+THMA(_src, _length) => ta.wma(3 * ta.wma(_src, _length / 3) - ta.wma(_src, _length / 2) - ta.wma(_src, _length), _length)
+
+HullMode(modeSwitch, src, len) =>
+  modeSwitch == 'HMA'   ? HMA (src, len) :
+  modeSwitch == 'EHMA'  ? EHMA(src, len) :
+  modeSwitch == 'TEHMA' ? THMA(src, len / 2) : na
+
+// ***************************************************************************************************
+//
+//
+// INPUT
+//
+//
+// ***************************************************************************************************
+Group6000 = 'ATR Ranging - SHOW'
+atrRangeShowBgnd                      = input.bool(false,                            group=Group6000,                                                                  title='Show ranging as background')
+atrRangeShowAtr                       = input.bool(false,                           group=Group6000,                                                                  title='Show ATR')
+atrRangeShowMa                        = input.bool(false,                           group=Group6000,                                                                  title='Show MA')
+
+Group6020 = 'ATR Ranging'
+tooltipThma='TEHMA, the "T" = the "tripple" in the Tripple Expotential Moving Average. I.e., TEHMA is even more weighted to the most recent price moves than the EHMA.'
+
+atrRangeAtrLength                     = input.int(18,                               group=Group6020, minval=2,                                                        title='ATR length')
+atrRangeHmaModeSwitch                 = input.string('TEHMA',                        group=Group6020,                                                                  title='HMA variation', options=['-', 'HMA', 'EHMA', 'TEHMA'], tooltip=tooltipThma)
+atrRangeHmaLength                     = input.int(200,                              group=Group6020, minval=2, step=5,                                                title='HMA length')
+
+// ***************************************************************************************************
+//
+//
+// INDICATOR
+//
+//
+// ***************************************************************************************************
+atrRangeAtr  = HullMode(atrRangeHmaModeSwitch, ta.tr,       atrRangeAtrLength)
+atrRangeMa   = HullMode(atrRangeHmaModeSwitch, atrRangeAtr, atrRangeHmaLength)
+atrRangeCond = atrRangeHmaModeSwitch != "-" and atrRangeMa > atrRangeAtr
+
+// ***************************************************************************************************
+//
+//
+// SHOW
+//
+//
+// ***************************************************************************************************
+
+
+bgcolor(color.black)
+bgcolor(atrRangeShowBgnd and atrRangeCond ? color.new(color.green, 90): na, title="ATR Ranging: Background")
+
+//plot(atrRangeShowAtr ? atrRangeAtr : na, color=color.new(#3179f5, 0), title="ATR Ranging: ATR")
+//plot(atrRangeShowMa  ? atrRangeMa  : na, color=color.new(#f57c00, 0), title="ATR Ranging: HMA")  
+    
+// SAR
+//sarShortEntry = false
+//sarLongEntry = false
+
+//startSAR = input(0.02)
+//incrementSAR = input(0.02)
+//maximumSAR = input(0.2)
+
+//SAR = ta.sar(startSAR, incrementSAR, maximumSAR)
+//plot(SAR, "ParabolicSAR", style=plot.style_cross, color=#2962FF)
+//if (SAR > resulting_close and SAR[1] > resulting_close)
+//    sarShortEntry := true
+//if (SAR < resulting_close and SAR[1] < resulting_close)
+//    sarLongEntry := true
+
+// StochRSI
+StochRSIsmoothK = input.int(3, "K", minval=1)
+StochRSIsmoothD = input.int(3, "D", minval=1)
+StochRSIlengthRSI = input.int(14, "RSI Length", minval=1)
+StochRSIlengthStoch = input.int(14, "Stochastic Length", minval=1)
+//StochRSIsrc = input(close, title="RSI Source")
+StochRSIsrc = resulting_close
+StochRSIrsi1 = ta.rsi(StochRSIsrc, StochRSIlengthRSI)
+StochRSIK = ta.sma(ta.stoch(StochRSIrsi1, StochRSIrsi1, StochRSIrsi1, StochRSIlengthStoch), StochRSIsmoothK)
+StochRSID = ta.sma(StochRSIK, StochRSIsmoothD)
+
+//plot(StochRSIK, title="StochRSIK")
+//plot(StochRSID, title="StochRSID")
+
+// stochastic built-in
+StochperiodK = input.int(14, title="%K Length", minval=1)
+StochsmoothK = input.int(1, title="%K Smoothing", minval=1)
+StochperiodD = input.int(3, title="%D Smoothing", minval=1)
+Stochk = ta.sma(ta.stoch(resulting_close, resulting_high, resulting_low, StochperiodK), StochsmoothK)
+Stochd = ta.sma(Stochk, StochperiodD)
+//plot(Stochk, title="%K", color=#2962FF)
+//plot(Stochd, title="%D", color=#FF6D00)
+//h0 = hline(80, "Upper Band", color=#787B86)
+//h1 = hline(20, "Lower Band", color=#787B86)
+//fill(h0, h1, color=color.rgb(33, 150, 243, 90), title="Background")
+
+// cvd
+// Inputs
+periodMa = input.int(title='MA Length', minval=1, defval=100)
+plotMa = input(title='Plot MA?', defval=false)
+
+// Calculations (Bull & Bear Balance Indicator by Vadim Gimelfarb)
+iff_1 = resulting_close[1] < resulting_open ? math.max(resulting_high - resulting_close[1], resulting_close - resulting_low) : math.max(resulting_high - resulting_open, resulting_close - resulting_low)
+iff_2 = resulting_close[1] > resulting_open ? resulting_high - resulting_low : math.max(resulting_open - resulting_close[1], resulting_high - resulting_low)
+iff_3 = resulting_close[1] < resulting_open ? math.max(resulting_high - resulting_close[1], resulting_close - resulting_low) : resulting_high - resulting_open
+iff_4 = resulting_close[1] > resulting_open ? resulting_high - resulting_low : math.max(resulting_open - resulting_close[1], resulting_high - resulting_low)
+iff_5 = resulting_close[1] < resulting_open ? math.max(resulting_open - resulting_close[1], resulting_high - resulting_low) : resulting_high - resulting_low
+iff_6 = resulting_close[1] > resulting_open ? math.max(resulting_high - resulting_open, resulting_close - resulting_low) : iff_5
+iff_7 = resulting_high - resulting_close < resulting_close - resulting_low ? iff_4 : iff_6
+iff_8 = resulting_high - resulting_close > resulting_close - resulting_low ? iff_3 : iff_7
+iff_9 = resulting_close > resulting_open ? iff_2 : iff_8
+bullPower = resulting_close < resulting_open ? iff_1 : iff_9
+iff_10 = resulting_close[1] > resulting_open ? math.max(resulting_close[1] - resulting_open, resulting_high - resulting_low) : resulting_high - resulting_low
+iff_11 = resulting_close[1] > resulting_open ? math.max(resulting_close[1] - resulting_low, resulting_high - resulting_close) : math.max(resulting_open - resulting_low, resulting_high - resulting_close)
+iff_12 = resulting_close[1] > resulting_open ? math.max(resulting_close[1] - resulting_open, resulting_high - resulting_low) : resulting_high - resulting_low
+iff_13 = resulting_close[1] > resulting_open ? math.max(resulting_close[1] - resulting_low, resulting_high - resulting_close) : resulting_open - resulting_low
+iff_14 = resulting_close[1] < resulting_open ? math.max(resulting_open - resulting_low, resulting_high - resulting_close) : resulting_high - resulting_low
+iff_15 = resulting_close[1] > resulting_open ? math.max(resulting_close[1] - resulting_open, resulting_high - resulting_low) : iff_14
+iff_16 = resulting_high - resulting_close < resulting_close - resulting_low ? iff_13 : iff_15
+iff_17 = resulting_high - resulting_close > resulting_close - resulting_low ? iff_12 : iff_16
+iff_18 = resulting_close > resulting_open ? iff_11 : iff_17
+bearPower = resulting_close < resulting_open ? iff_10 : iff_18
+
+// Calculations (Bull & Bear Pressure Volume)
+bullVolume = bullPower / (bullPower + bearPower) * resulting_volume
+bearVolume = bearPower / (bullPower + bearPower) * resulting_volume
+
+// Calculations Delta
+delta = bullVolume - bearVolume
+cvd = ta.cum(delta)
+cvdMa = ta.sma(cvd, periodMa)
+
+// Plotting
+//customColor = cvd > cvdMa ? color.new(color.teal, 50) : color.new(color.red, 50)
+//plotRef1 = plot(cvd, style=plot.style_line, linewidth=1, color=color.new(color.black, 0), title='CVD')
+//plotRef2 = plot(plotMa ? cvdMa : na, style=plot.style_line, linewidth=1, color=color.new(color.black, 0), title='CVD MA')
+//fill(plotRef1, plotRef2, color=customColor)
+    
+
+// Divergences Profiles
+// -----
+
+// SHORT ENTRY
+
+
+divergencesShortEntryProfileIndicators = array.new_string()
+
+divergencesShortEntryProfilePivotPeriod = 3
+divergencesShortEntryProfileLimit = 2
+divergencesShortEntryProfileMinPriceChange = 1
+array.push(divergencesShortEntryProfileIndicators, "adp")
+array.push(divergencesShortEntryProfileIndicators, "diosc")
+//array.push(divergencesShortEntryProfileIndicators, "mom")
+array.push(divergencesShortEntryProfileIndicators, "vwmacd")
+array.push(divergencesShortEntryProfileIndicators, "mfi")
+
+//divergencesShortEntryProfileLimit = showlimit
+//divergencesShortEntryProfilePivotPeriod = prd
+//divergencesShortEntryProfileMinPriceChange = minPriceChangeToConsiderQualityDivInPercentage
+//if (calcadp)
+//    array.push(divergencesShortEntryProfileIndicators, "adp")
+//if (calcmacda)
+//    array.push(divergencesShortEntryProfileIndicators, "deltamacd")
+//if (calcrsi)
+//    array.push(divergencesShortEntryProfileIndicators, "rsi")
+//if (calcstoc)
+//    array.push(divergencesShortEntryProfileIndicators, "stoch")
+//if (calccci)
+//    array.push(divergencesShortEntryProfileIndicators, "cci")
+//if (calcmom)
+//    array.push(divergencesShortEntryProfileIndicators, "mom")
+//if (calcdi)
+//    array.push(divergencesShortEntryProfileIndicators, "diosc")
+//if (calcvwmacd)
+//    array.push(divergencesShortEntryProfileIndicators, "vwmacd")
+//if (calccmf)
+//    array.push(divergencesShortEntryProfileIndicators, "cmf")
+//if (calcmfi)
+//    array.push(divergencesShortEntryProfileIndicators, "mfi")
+    
+
+    
+// SHORT EXIT    
+    
+divergencesShortExitProfileIndicators = array.new_string() 
+
+divergencesShortExitProfilePivotPeriod = 3
+divergencesShortExitProfileLimit = 2
+divergencesShortExitProfileMinPriceChange = 2
+array.push(divergencesShortExitProfileIndicators, "diosc")
+array.push(divergencesShortExitProfileIndicators, "adp")
+array.push(divergencesShortExitProfileIndicators, "mom")
+array.push(divergencesShortExitProfileIndicators, "rsi")
+
+//divergencesShortExitProfileLimit = showlimit
+//divergencesShortExitProfilePivotPeriod = prd
+//divergencesShortExitProfileMinPriceChange = minPriceChangeToConsiderQualityDivInPercentage
+//if (calcadp)
+//    array.push(divergencesShortExitProfileIndicators, "adp")
+//if (calcmacda)
+//    array.push(divergencesShortExitProfileIndicators, "deltamacd")
+//if (calcrsi)
+//    array.push(divergencesShortExitProfileIndicators, "rsi")
+//if (calcstoc)
+//    array.push(divergencesShortExitProfileIndicators, "stoch")
+//if (calccci)
+//    array.push(divergencesShortExitProfileIndicators, "cci")
+//if (calcmom)
+//    array.push(divergencesShortExitProfileIndicators, "mom")
+//if (calcdi)
+//    array.push(divergencesShortExitProfileIndicators, "diosc")
+//if (calccmf)
+//    array.push(divergencesShortExitProfileIndicators, "cmf")
+//if (calcmfi)
+//   array.push(divergencesShortExitProfileIndicators, "mfi")
+//if (calcvwmacd)
+//   array.push(divergencesShortExitProfileIndicators, "vwmacd")
+
+
+
+
+
+// LONG ENTRY 
+
+divergencesLongEntryProfileIndicators = array.new_string()
+
+divergencesLongEntryProfilePivotPeriod = 5
+divergencesLongEntryProfileLimit = 2
+divergencesLongEntryProfileMinPriceChange = 3
+array.push(divergencesLongEntryProfileIndicators, "adp")
+array.push(divergencesLongEntryProfileIndicators, "diosc")
+array.push(divergencesLongEntryProfileIndicators, "rsi")
+array.push(divergencesLongEntryProfileIndicators, "mom")
+
+//divergencesLongEntryProfileLimit = showlimit
+//divergencesLongEntryProfilePivotPeriod = prd
+//divergencesLongEntryProfileMinPriceChange = minPriceChangeToConsiderQualityDivInPercentage
+
+//if (calcadp)
+//    array.push(divergencesLongEntryProfileIndicators, "adp")
+//if (calcmacda)
+//    array.push(divergencesLongEntryProfileIndicators, "deltamacd")
+//if (calcrsi)
+//    array.push(divergencesLongEntryProfileIndicators, "rsi")
+//if (calcstoc)
+//    array.push(divergencesLongEntryProfileIndicators, "stoch")
+//if (calccci)
+//    array.push(divergencesLongEntryProfileIndicators, "cci")
+//if (calcmom)
+//    array.push(divergencesLongEntryProfileIndicators, "mom")
+//if (calcdi)
+//    array.push(divergencesLongEntryProfileIndicators, "diosc")
+//if (calccmf)
+////    array.push(divergencesLongEntryProfileIndicators, "cmf")
+//if (calcmfi)
+//    array.push(divergencesLongEntryProfileIndicators, "mfi")
+//if (calcvwmacd)
+//    array.push(divergencesLongEntryProfileIndicators, "vwmacd")
+
+// LONG EXIT 
+
+divergencesLongExitProfileIndicators = array.new_string()
+
+divergencesLongExitProfilePivotPeriod = 5
+divergencesLongExitProfileLimit = 3
+divergencesLongExitProfileMinPriceChange = 3
+array.push(divergencesLongExitProfileIndicators, "adp")
+array.push(divergencesLongExitProfileIndicators, "diosc")
+array.push(divergencesLongExitProfileIndicators, "rsi")
+array.push(divergencesLongExitProfileIndicators, "vwmacd")
+array.push(divergencesLongExitProfileIndicators, "cci")
+array.push(divergencesLongExitProfileIndicators, "mom")
+
+//divergencesLongExitProfileLimit = showlimit 
+//divergencesLongExitProfilePivotPeriod = prd
+//divergencesLongExitProfileMinPriceChange = minPriceChangeToConsiderQualityDivInPercentage
+
+//if (calcadp)
+//    array.push(divergencesLongExitProfileIndicators, "adp")
+//if (calcmacda)
+//    array.push(divergencesLongExitProfileIndicators, "deltamacd")
+//if (calcrsi)
+//    array.push(divergencesLongExitProfileIndicators, "rsi")
+//if (calcstoc)
+//    array.push(divergencesLongExitProfileIndicators, "stoch")
+//if (calccci)
+//    array.push(divergencesLongExitProfileIndicators, "cci")
+//if (calcmom)
+//    array.push(divergencesLongExitProfileIndicators, "mom")
+//if (calcdi)
+//    array.push(divergencesLongExitProfileIndicators, "diosc")
+//if (calccmf)
+//    array.push(divergencesLongExitProfileIndicators, "cmf")
+//if (calcmfi)
+//    array.push(divergencesLongExitProfileIndicators, "mfi")
+//if (calcvwmacd)
+//    array.push(divergencesLongExitProfileIndicators, "vwmacd")
+
+
+plot(bullishDivergenceDetectedShortEntryTemp ? 1 : na, title="bullishDivergenceDetectedShortEntryTemp", display = display.data_window)
+plot(bullishDivergenceDetectedShortExitTemp ? 1 : na, title="bullishDivergenceDetectedShortExitTemp", display = display.data_window)
+plot(bearishDivergenceDetectedLongEntryTemp ? 1 : na, title="bearishDivergenceDetectedLongEntryTemp", display = display.data_window)
+plot(bearishDivergenceDetectedLongExitTemp ? 1 : na, title="bearishDivergenceDetectedLongExitTemp", display = display.data_window)
+
+
+
+
+//bullishDivergenceDetectedShort := bullishDivergenceDetectedShortEntryTemp
+//bearishDivergenceDetectedShort := bearishDivergenceDetectedShortEntryTemp
+
+//if (pl_short)
+    //label.new(bar_index, 0, "pl_positions General\na: " + str.tostring(pl_positions_general) + "\na:pl_positions Short\na: " + str.tostring(pl_positions) , size = size.small)
+//    label.new(bar_index, 0, "pl_vals long\na: " + str.tostring(pl_vals_long) + "\na:pl_vals Short\na: " + str.tostring(pl_vals_short) , size = size.small)
+ 
+ 
+//[lastSellDivergenceTargetPriceSidewaysLong,     lastBuyDivergenceTargetPriceSidewaysLong,   sellDivergenceAgeSidewaysLong,      lastSellDivergenceAgeSidewaysLong,      sellDivergenceClosePriceSidewaysLong,   sellDivergenceIntactSidewaysLong,   sellDivergenceOvercomeSidewaysLong,     sellDivergenceIntactRemovalSidewaysLong,    sellDivergenceRejectedSidewaysLong,     sellDivergenceCompletedSidewaysLong,    sellDivergenceConfirmedSidewaysLong,    buyDivergenceAgeSidewaysLong,   lastBuyDivergenceAgeSidewaysLong,   buyDivergenceClosePriceSidewaysLong,    buyDivergenceIntactSidewaysLong,    buyDivergenceOvercomeSidewaysLong,      buyDivergenceIntactRemovalSidewaysLong,     buyDivergenceRejectedSidewaysLong,      buyDivergenceCompletedSidewaysLong,     buyDivergenceConfirmedSidewaysLong, bullishDivergenceDetectedSidewaysLong, bearishDivergenceDetectedSidewaysLong] = updateDivergenceVariables(divergencesSidewaysLongProfileIndicators, divergencesSidewaysLongProfileLimit)
+//[lastSellDivergenceTargetPriceSidewaysShort,    lastBuyDivergenceTargetPriceSidewaysShort,  sellDivergenceAgeSidewaysShort,     lastSellDivergenceAgeSidewaysShort,     sellDivergenceClosePriceSidewaysShort,  sellDivergenceIntactSidewaysShort,  sellDivergenceOvercomeSidewaysShort,    sellDivergenceIntactRemovalSidewaysShort,   sellDivergenceRejectedSidewaysShort,    sellDivergenceCompletedSidewaysShort,   sellDivergenceConfirmedSidewaysShort,   buyDivergenceAgeSidewaysShort,  lastBuyDivergenceAgeSidewaysShort,  buyDivergenceClosePriceSidewaysShort,   buyDivergenceIntactSidewaysShort,   buyDivergenceOvercomeSidewaysShort,     buyDivergenceIntactRemovalSidewaysShort,    buyDivergenceRejectedSidewaysShort,     buyDivergenceCompletedSidewaysShort,    buyDivergenceConfirmedSidewaysShort, bullishDivergenceDetectedSidewaysShort, bearishDivergenceDetectedSidewaysShort] = updateDivergenceVariables(divergencesSidewaysShortProfileIndicators, divergencesSidewaysShortProfileLimit)
+ 
+
+// -------------------
+// Code for Divergences with MADX and Divergences for Many v4
+// -------------------
+
+
+
+
+
+   
+//if (array.get(divArrLong, buyDivergenceIntactRemovalArrayIndex))
+//    array.push(longSignals, 'buy-div-reneval')
+    
+//if (array.get(divArrShort, sellDivergenceIntactRemovalArrayIndex))
+//    array.push(shortSignals, 'sell-div-reneval')
+    
+//plot(buyDivergence ? 1 : 0, title="buyDivergence", display=display.none)
+//plot(sellDivergence ? 1 : 0, title="sellDivergence", display=display.none)
+
+//plot(sellDivergenceClosePriceShort, title="sellDivergenceClosePrice", display=display.none)
+//plot(buyDivergenceClosePriceLong, title="buyDivergenceClosePrice", display=display.none)
+
+// momentum built-in
+len_momentum = input.int(10, minval=1, title="Length momentum")
+//src_momentum = input(close, title="Source")
+src_momentum = resulting_close
+momentum = src - src[len_momentum]
+//plot(momentum, color=#2962FF, title="momentum") 
+
+// RAVI everget
+fastLength = input.int(title='RAVI Fast MA Length', defval=7, minval=1)
+fastMAInput = input.string(title='RAVI Fast MA', defval='SMA', options=['EMA', 'SMA', 'VWMA', 'WMA'])
+slowLength = input.int(title='RAVI Slow MA Length', defval=65, minval=1)
+slowMAInput = input.string(title='RAVI Slow MA', defval='SMA', options=['EMA', 'SMA', 'VWMA', 'WMA'])
+breakoutLevel = input.float(title='RAVI Breakout Level', minval=0, step=0.1, defval=1)
+//src_RAVI = input(title='Source', defval=close)
+src_RAVI = resulting_close
+highlightMovements = input(title='Highlight Movements ?', defval=true)
+highlightBreakouts = input(title='Highlight Level Breakouts ?', defval=true)
+
+//VOLUME WEIGHTED MACD V2 VWMACDV2 BY KIVANÇ fr3762 von KivancOzbilgic
+fastperiod = input.int(12, title='fastperiod', minval=1, maxval=500)
+slowperiod = input.int(26, title='slowperiod', minval=1, maxval=500)
+signalperiod = input.int(9, title='signalperiod', minval=1, maxval=500)
+fastMA_vwmacd = ta.ema(resulting_volume * resulting_close, fastperiod) / ta.ema(resulting_volume, fastperiod)
+slowMA_vwmacd = ta.ema(resulting_volume * resulting_close, slowperiod) / ta.ema(resulting_volume, slowperiod)
+vwmacd_vwmacd = fastMA_vwmacd - slowMA_vwmacd
+signal_vwmacd = ta.ema(vwmacd_vwmacd, signalperiod)
+hist_vwmacd = vwmacd_vwmacd - signal_vwmacd
+//plot(vwmacd_vwmacd, color=color.new(color.blue, 0), linewidth=2)
+//plot(signal_vwmacd, color=color.new(color.red, 0), linewidth=2)
+//plot(hist_vwmacd, color=color.new(color.green, 0), linewidth=4, style=plot.style_histogram)
+//plot(0, color=color.new(color.black, 0))
+
+ema_1 = ta.ema(src_RAVI, fastLength)
+sma_1 = ta.sma(src_RAVI, fastLength)
+vwma_1 = ta.vwma(src_RAVI, fastLength)
+wma_1 = ta.wma(src_RAVI, fastLength)
+iff_1_RAVI = fastMAInput == 'WMA' ? wma_1 : na
+iff_2_RAVI = fastMAInput == 'VWMA' ? vwma_1 : iff_1_RAVI
+iff_3_RAVI = fastMAInput == 'SMA' ? sma_1 : iff_2_RAVI
+fastMA_RAVI = fastMAInput == 'EMA' ? ema_1 : iff_3_RAVI
+
+ema_2 = ta.ema(src_RAVI, slowLength)
+sma_2 = ta.sma(src_RAVI, slowLength)
+vwma_2 = ta.vwma(src_RAVI, slowLength)
+wma_2 = ta.wma(src_RAVI, slowLength)
+iff_4_RAVI = slowMAInput == 'WMA' ? wma_2 : na
+iff_5_RAVI = slowMAInput == 'VWMA' ? vwma_2 : iff_4_RAVI
+iff_6_RAVI = slowMAInput == 'SMA' ? sma_2 : iff_5_RAVI
+slowMA_RAVI = slowMAInput == 'EMA' ? ema_2 : iff_6_RAVI
+
+ravi = 100 * math.abs(fastMA_RAVI - slowMA_RAVI) / slowMA_RAVI
+
+raviColor = highlightMovements ? ravi > ravi[1] ? color.green : color.red : #3c78d8
+//plot(ravi, title='RAVI', histbase=breakoutLevel, linewidth=2, color=raviColor)
+
+//hline(breakoutLevel, title='Breakout Level', linestyle=hline.style_dotted)
+
+transparent = color.new(color.white, 100)
+//breakoutFillColor = ravi < breakoutLevel and highlightBreakouts and adx_trend == "seitwaerts" and (useRAVIForEntriesSidewaysLong or useRAVIForEntriesSidewaysShort) ? #ff9800 : transparent
+//bgcolor(color.new(breakoutFillColor, 90))
+
+ravi_trend = "neutral"
+if (ravi < breakoutLevel)
+    ravi_trend := "seitwaerts"
+else
+    ravi_trend := "trending"
+    
+    
+    
+
+
+//if (ama > ama[1])
+//    strategy.entry("long", strategy.long)
+
+//if (ama < ama[1])
+//    strategy.entry("short", strategy.short)
+    
+//plot(ama, title="AMA", linewidth=2, color=amaColor, transp=0)
+
+varip low_of_last_candle = 0.0
+
+varip tradeType = string(na)
+
+//long variables
+varip entryPriceLong = 0.0
+
+varip stopLossPriceLong = 0.0
+varip tempStopLossPriceLong = 0.0
+varip takeProfitPriceLong = 0.0
+varip profitLevelReachedLong = 0.0
+
+varip countSizeChanges = 0
+
+varip entryPriceReached = false
+executingTradeLong = false
+executingClose = false
+varip resultingStopPriceLong = 0.0
+varip tradeMethodLong = 'none'
+varip tradeMethodLongTightOrBroad = 'none'
+varip tradeAgeLong = 0
+varip tradeAgeShort = 0
+varip earningsAfterCloseTrade = 0.0
+
+longStopPrice = 0.0
+stoplossSetLong = false
+
+//short variables
+varip tradeMethodShort = 'none'
+varip hh10AtEntry = 0.0
+varip hh5AtEntry = 0.0
+
+varip entryPriceShort = 0.0
+resultingStopPriceShort = 0.0
+
+resultingTakeProfitStartPercLong = 0.0
+resultingTrailPercLong = 0.0
+
+varip stopLossPriceShort = 0.0
+varip takeProfitPriceShort = 0.0
+varip profitLevelReachedShort = 0.0
+
+executingTradeShort = false
+
+
+// short condition part
+shortEntry = false
+shortEntrySignalDespiteDeactivated = false
+shortClose = false
+shortCloseReason = ""
+
+longEntry = false
+longEntrySignalDespiteDeactivated = false
+longClose = false
+longCloseReason = ""
+varip short_window = false
+varip short_window_nls2 = false
+
+array.clear(longCloseSignals)
+array.clear(longSignals)
+array.clear(shortCloseSignals)
+array.clear(shortSignals) 
+
+varip ll4w_trend = string(na)
+ll4w_trendchange = bool(false)
+
+varip customTrailStartPercShort = float(na)
+varip customTrailPercShort = float(na)
+
+varip tradeSellDivsLowestPriceShort = float(na)
+
+resultingLimitPrice = float(na)
+
+// macht eventuell langsam beim klikcne!!
+//occuranceSellDivergence10MultLong = returnOccuranceOfConditionBool("bool", sellDivergence, "==", 1, (periodForDivergenceCheckLong * 10))
+//occuranceSellDivergence3MultLong = returnOccuranceOfConditionBool("bool", sellDivergence, "==", 1, (periodForDivergenceCheckLong * 3))
+//occuranceSellDivergenceLong = returnOccuranceOfConditionBool("bool", sellDivergence, "==", 1, periodForDivergenceCheckLong)
+//occuranceBuyDivergence10MultLong = returnOccuranceOfConditionBool("bool", buyDivergence, "==", 1, periodForDivergenceCheckLong * 10)
+//occuranceBuyDivergence3MultLong = returnOccuranceOfConditionBool("bool", buyDivergence, "==", 1, periodForDivergenceCheckLong * 9)
+//occuranceBuyDivergenceLong = returnOccuranceOfConditionBool("bool", buyDivergence, "==", 1, periodForDivergenceCheckLong)
+
+//occuranceSellDivergence10MultShort = returnOccuranceOfConditionBool("bool", sellDivergence, "==", 1, (periodForDivergenceCheckShort * 10))
+//occuranceSellDivergence3MultShort = returnOccuranceOfConditionBool("bool", sellDivergence, "==", 1, (periodForDivergenceCheckShort * 3))
+//occuranceSellDivergenceShort = returnOccuranceOfConditionBool("bool", sellDivergence, "==", 1, periodForDivergenceCheckShort)
+//occuranceBuyDivergence10MultShort = returnOccuranceOfConditionBool("bool", buyDivergence, "==", 1, periodForDivergenceCheckShort * 10)
+//occuranceBuyDivergence3MultShort = returnOccuranceOfConditionBool("bool", buyDivergence, "==", 1, periodForDivergenceCheckShort * 9)
+//occuranceBuyDivergenceShort = returnOccuranceOfConditionBool("bool", buyDivergence, "==", 1, periodForDivergenceCheckShort)
+
+varip undestroyableTradeShort = false
+varip undestroyableTradeLong = false
+
+varip tradeEntryIsCustomShort = false
+varip tradeEntryIsCustomLong = false
+
+varip squeeze_started = false
+
+initialStopLossPriceLong = stopLossPriceLong
+initialStopLossPriceShort = stopLossPriceShort
+
+lowBBWPhase = false
+varip distanceToStartOfSqueeze = int(na)
+distanceToStartOfLowBBPhase = 0
+squeezeStartInsideLowBBWPhase = false
+higherSqueezeZone = float(na)
+lowerSqueezeZone = float(na)
+
+distanceToLastSmmaTrendEndSignal = float(na)
+
+varip smmaTrendEndSignalLong = false
+varip smmaTrendEndSignalShort = false
+
+trendChangePhase = false
+varip tradePutToSARShort = false
+
+checkForSqueezeZone(price) =>
+    priceInSqueezeZone = false
+    if (price < higherSqueezeZone and price > lowerSqueezeZone)
+        priceInSqueezeZone := true
+    priceInSqueezeZone
+    
+channelSize = float(na)
+
+varip isSARPeriodToOmission = false
+
+divergenceCloseLong = false
+
+// -------------
+// Entry Signals
+// -------------
+
+// Preparation
+// -----------
+
+if bbw_short <= ta.lowest(bbw_short, 96)
+    squeeze_started := true
+    
+//if bbw > VLI_slow
+//    squeeze_started := false
+
+//if ta.crossunder(close, bollinger_bot) and squeeze_started 
+lowBBWPhase := returnOccuranceOfCondition("float", bbw_short, "<", VLI_slow, 20) > 15 and returnOccuranceOfCondition("float", bbw_short, "<", VLI_fast, 20) > 15
+
+distanceToStartOfLowBBPhase := returnDistanceToConditionBool(lowBBWPhase, "==", 0, 500)
+
+distanceToStartOfSqueeze := returnDistanceToConditionBool(squeeze_started, "==", 1, 500)
+
+squeezeStartInsideLowBBWPhase := (distanceToStartOfLowBBPhase * 2) > distanceToStartOfSqueeze
+
+//channelSize := (ta.sma(bbw_short, 200) * resulting_close) / 1.75
+//
+//higherSqueezeZone := resulting_close[distanceToStartOfSqueeze] + channelSize
+//
+//lowerSqueezeZone := resulting_close[distanceToStartOfSqueeze] - channelSize
+
+//channelSize := ta.sma(bbw_short, 50) * 10
+//channelSize := (ta.ema(bbw_short / 2, 100) * close)
+
+realBBW = bollinger_top_short - bollinger_bot_short
+
+channelSize := ta.sma(realBBW, 50) / 2.5
+
+plot(realBBW, title="realBBW", display = display.data_window)
+
+//atrSqueeze = ta.tr(14) 
+//
+//channelSize := (ta.ema(atrSqueeze, 50)) 
+
+higherSqueezeZone := close[distanceToStartOfSqueeze] + channelSize
+lowerSqueezeZone := close[distanceToStartOfSqueeze] - channelSize
+
+
+
+
+
+
+distanceToLastSmmaTrendEndSignal := returnDistanceToConditionBool(smmaTrendEndSignalLong, "==", 1, 500)
+
+if (distanceToLastSmmaTrendEndSignal != 500 and distanceToLastSmmaTrendEndSignal < 240)
+    trendChangePhase := true
+else 
+    trendChangePhase := false
+
+
+len_lr = input.int(defval=120, title='Length LR', minval=10, group="Additional")
+devlen_lr = input.float(defval=2., title='Deviation', minval=0.1, step=0.1, group="Additional")
+src_lr = close
+upcol = input.color(defval=color.lime, title='Up/Down Trend Colors', inline='trcols', group="Additional")
+dncol = input.color(defval=color.red, title='', inline='trcols', group="Additional")
+
+var fibo_ratios = array.new_float(0)
+var colors = array.new_color(2)
+if barstate.isfirst
+    array.unshift(colors, upcol)
+    array.unshift(colors, dncol)
+    array.push(fibo_ratios, 0.236)
+    array.push(fibo_ratios, 0.382)
+    array.push(fibo_ratios, 0.618)
+    array.push(fibo_ratios, 0.786)
+
+get_channel(src_lr, len_lr) =>
+    mid = math.sum(src_lr, len_lr) / len_lr
+    slope = ta.linreg(src_lr, len_lr, 0) - ta.linreg(src_lr, len_lr, 1)
+    intercept = mid - slope * math.floor(len_lr / 2) + (1 - len_lr % 2) / 2 * slope
+    endy = intercept + slope * (len_lr - 1)
+    dev = 0.0
+    for x = 0 to len_lr - 1 by 1
+        dev += math.pow(src_lr[x] - (slope * (len_lr - x) + intercept), 2)
+        dev
+    dev := math.sqrt(dev / len_lr)
+    [intercept, endy, dev, slope]
+
+[y1_, y2_, dev, slope] = get_channel(src_lr, len_lr)
+
+upper_linreg = y2_ + 2 * dev
+lower_linreg = y2_ - 2 * dev
+
+plot(not showOnlyDemoItems ? upper_linreg : na, title="upper_linreg", color = color.orange)
+plot(not showOnlyDemoItems ? lower_linreg : na, title="lower_linreg", color = color.blue)
+ 
+stdev_average = ( ta.sma(ta.tr, 12) + ta.ema(ta.tr, 12) ) / 2
+
+tradeBGColor = color.new(color.white, 100)
+
+
+
+
+if time_cond
+
+    // ----------------                     
+    // Buy Signals
+    // ----------------
+    
+    // Short
+    // -----
+    
+    // vwmacd
+//    if (ta.crossunder(vwmacd_vwmacd, signal_vwmacd))
+//        array.push(shortSignals, "vwmacd")
+    
+    // SAR
+//    if (sarShortEntry)
+//        array.push(shortSignals, "SAR")
+    
+    // Murphy
+//    if (ta.crossunder(smaDmacFast, smaDmacMid))
+//        array.push(shortSignals, "Murphy")
+    
+    //-------- short_window funktionen --------
+      
+    // ausbruch
+    // ausbruch bb und crossover bbw vli_slow
+    if (ta.crossover(bbw_short, VLI_fast)) 
+        short_window := true
+    
+    if (ta.crossunder(resulting_close, bollinger_bot_short) and short_window)
+        //shortEntry := true
+        array.push(shortSignals, "ausbruch")
+        short_window := false
+    
+    
+    
+    // nls2
+    //if (shortMethod == "nls2")
+    if (ta.crossover(resulting_close, bollinger_bot_short) and vol_condition and squeeze_started)
+        if (bbw_short < VLI_slow)
+            //if (rsi(close, 200) < 50)
+            short_window_nls2 := true
+                
+    if (ta.crossover(resulting_close, bollinger_basis_short))
+        short_window_nls2 := false
+    
+    if (short_window_nls2 and (ta.crossover(sma_slow, sma_mid) or ta.crossover(sma_veryslow, sma_slow) or ta.crossover(sma_veryslow, sma_mid)))
+        if (bbw_short < VLI_top)
+            array.push(shortSignals, "nls2")
+            short_window_nls2 := false
+            
+    //-------- eof short_window funktionen --------
+    
+    
+    
+    
+    
+    
+    //nls2 long spiegel
+//    if (resulting_close < bollinger_bot_short and VLI_top and not atrRangeCond and squeeze_started)// and sellDivergenceConfirmed) 
+        //if (close < sma_fast) // 2
+        //    if (bbw < VLI_top) // 3
+//        if (low_volatility_level) // 4
+            //if (sma_mid < sma_veryslow) // 5
+//            array.push(shortSignals, "nls2 long mirror")
+//            if returnOccuranceOfConditionString("string", vwmaTrend, "==", "down", 10) > 9
+//                array.push(shortSignals, "broad1")
+//            else
+//                array.push(shortSignals, "tight")
+                    //else 
+                    //    array.push(shortSignals, "nls2 long mirror")
+                    //    array.push(shortSignals, "broad3")
+                //else if (high_volatility_level) // dürfte es entsprechend dem Kommentar "# high volatility" sein
+                //else if (not high_volatility_level)
+                //else if (sma_mid > sma_slow and sma_mid > sma_veryslow)
+                //else if (sma_mid > sma_veryslow or sma_slow > sma_veryslow)
+                //else if (sma_mid < sma_slow)
+                //else 
+                    //if (sma_veryslow > sma_slow and sma_slow > sma_mid)
+                    //    1+1
+                    //else
+                //    array.push(shortSignals, "nls2 long mirror")
+                //    array.push(shortSignals, "broad2")
+                    
+                //else if (not high_volatility_level)        
+        //else if (sma_slow < sma_veryslow) // 6
+//        else
+            //array.push(shortSignals, "nls2 long mirror")
+            //array.push(shortSignals, "tight")
+//            array.push(shortSignals, "nls2 long mirror")
+//            if returnOccuranceOfConditionString("string", vwmaTrend, "==", "down", 10) > 9
+//                array.push(shortSignals, "broad1")
+//            else
+//                array.push(shortSignals, "tight")
+    
+    
+    
+    
+    
+    
+    
+    // recht gut
+    //recht gut im alten timeframe und mit hohem shortloss und take profit03
+//    if (shortMethod == "recht gut")
+//        if (resulting_close < bollinger_bot_short and vol_condition and VLI_top)
+//            if (resulting_close < sma_fast and (sma_slow < sma_veryslow))  
+//                array.push(shortSignals, "recht gut")
+                
+//        if (short_window and (ta.crossover(sma_slow, sma_mid) or ta.crossover(sma_veryslow, sma_slow) or ta.crossover(sma_veryslow, sma_mid)))
+            //if (bbw < VLI_top)
+//            array.push(shortSignals, "recht gut")
+    
+    //BB mean reversion
+    //if (ta.crossover(close, bollinger_top))
+    //    array.push(shortSignals, "BB mean reversion")
+    
+    //short 4
+//    if ta.crossover(resulting_close, bollinger_bot_short) and squeeze_started
+//        if bbw_short < VLI_slow
+//            if sma_veryfast < sma_mid
+//                array.push(shortSignals, "short 4")
+        
+    // RSI
+    if (ta.crossunder(ta.rsi(resulting_close, 14), 70) and returnOccuranceOfCondition("float", ta.rsi(resulting_close, 14), ">", 75, 10) > 1)
+        array.push(shortSignals, "RSI")
+        
+    // MFI
+//    if (ta.crossunder(ta.mfi(resulting_close, 14), 70) and returnOccuranceOfCondition("float", ta.mfi(resulting_close, 14), ">", 70, 10) > 1)
+//        array.push(shortSignals, "MFI")
+        
+    // momentum
+    //if (ta.crossunder(momentum, 0))
+    //    array.push(shortSignals, "momentum")
+        
+    // AMA
+//    if (ama < ama[1] and ADXBaba > 20 and ADXBaba < 50)
+//        array.push(shortSignals, "AMA")
+        
+    // 4-Wochen-Regel
+    if (resulting_close < ll4w[1])
+        array.push(shortSignals, "4-Wochen-Regel")
+        ll4w_trend := "verkaufen"
+        if (ll4w_trend[1] != ll4w_trend)
+            ll4w_trendchange := true
+        
+    // BB DI divergence
+    //if (close < bollinger_bot and sellDivergenceIntact)
+    //    array.push(shortSignals, "BB DI divergence")
+        
+    // divergence RSI ausbruch
+//    if (sellDivergenceStatusShort == "intact")
+        //if (returnOccuranceOfCondition("float", ta.rsi(close, 14), ">", 70, 50) > 0)
+//        if (array_includes(shortSignals, "4-Wochen-Regel") or array.includes(shortSignals, "sell-div-reneval"))
+//            array.push(shortSignals, "divergence RSI ausbruch")
+            //sellDivergenceIntact := true
+            //sellDivergence := true
+            //sellDivergenceClosePrice := close
+            
+    // ultra-divs
+    //if (array_includes(shortSignals, "4-Wochen-Regel") or array_includes(shortSignals, "sell-div-reneval")) // or ta.crossunder(close, bollinger_bot)) 
+    //    if (occuranceSellDivergence10MultShort > 2 and occuranceSellDivergence3MultShort > 1 and occuranceSellDivergenceShort and occuranceBuyDivergence10MultShort < 1)
+    //        array.push(shortSignals, "ultra-divs")
+            //sellDivergenceIntact := true
+            //buyDivergence := true
+            //sellDivergenceClosePrice := close
+            
+    // Sideways RSI
+    //if (ta.crossunder(close, bollinger_top))
+    //    array.push(shortSignals, "Sideways RSI")
+     
+    // utra-ma   
+    // ultra vwma wechsel nach langer fast grüner Periode
+    // und hohes volumen
+    // etw 1.5 Monate 1080 Stunden  Beobachtungsperiode, weniger als 5% rote Kerzen erlaubt
+    //if (returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 1080) > 990) and smmaTrend == "down"
+    //    // wenn differenz von hh und ll der letzen 1.5 monate höher als 20% ist
+    //   if (ta.highest(1080) - ta.lowest(1080) > ta.highest(1080) / 5)
+    //        array.push(shortSignals, "utra-ma")
+            
+    // divergence rebound
+//    if divergenceNumber == 1// and close - lastSellDivergenceTargetPrice > close * 0.02
+//        array.push(shortSignals, "div rebound")
+        
+    // div confirmed
+//    if (array.get(divStringArrShort, sellDivergenceStatusArrayIndex) == "confirmed" and array.get(divStringArrShort, sellDivergenceStatusArrayIndex)[1] != "confirmed" and array.get(divStringArrShort, sellDivergenceStatusArrayIndex)[1] == "intact") and (resulting_close > bollinger_bot and 100 / (resulting_close / (array.get(divArrShort, sellDivergenceClosePriceArrayIndex) - resulting_close)) < 3)
+    if (sellDivergenceIntactShortEntry == true and sellDivergenceIntactShortEntry[1] == false)      
+        array.push(shortSignals, "div confirmed")
+        
+    // B-Methode 1
+    
+    //((sellDivergenceConfirmed and not sellDivergenceConfirmed[1]) or 
+    
+    //if confirmedBBBreakout('bot', bollinger_bot) and ((close[1] < higherSqueezeZone and close[1] > lowerSqueezeZone) or (high[1] < higherSqueezeZone and high[1] > lowerSqueezeZone)  or (low[1] < higherSqueezeZone and low[1] > lowerSqueezeZone))
+
+
+
+
+//if confirmedBBBreakout('bot', bollinger_bot) and (checkForSqueezeZone(close[1]) or checkForSqueezeZone(high[1]) or checkForSqueezeZone(low[1]) or checkForSqueezeZone(close[2]) or checkForSqueezeZone(close[3]) or checkForSqueezeZone(close[4]) or checkForSqueezeZone(close[5]) or checkForSqueezeZone(close[6]) or checkForSqueezeZone(close[7]) or (returnOccuranceOfConditionBool('bool', lowBBWPhase, "==", 1, 10) > 0 and returnOccuranceOfConditionBool('bool', squeezeStartInsideLowBBWPhase, "==", 1, 10) > 0))
+        
+//if confirmedBBBreakout('bot', bollinger_bot)
+    
+//and 
+//        (
+//              checkForSqueezeZone(close[1]) or checkForSqueezeZone(high[1]) or checkForSqueezeZone(low[1]) 
+//              or
+//              checkForSqueezeZone(close[2]) or checkForSqueezeZone(close[3]) or checkForSqueezeZone(close[4]) or checkForSqueezeZone(close[5]) or checkForSqueezeZone(close[6]) or checkForSqueezeZone(close[7])
+//              or 
+//            (
+//                returnOccuranceOfConditionBool('bool', lowBBWPhase, "==", 1, 10) > 0 and returnOccuranceOfConditionBool('bool', squeezeStartInsideLowBBWPhase, "==", 1, 10) > 0
+//            )
+//        )
+        
+        
+        
+        
+//    and 
+//        (
+//            sellDivergenceIntact or sellDivergenceCompleted
+//        )
+
+
+
+// if not extreme_volatility 
+// and returnOccuranceOfConditionString("string", slowSmmaTrend, "==", "down", 2) > 1 
+// and confirmedBBBreakout('bot', bollinger_bot_short) 
+// and (
+//    checkForSqueezeZone(resulting_close[1]) 
+//  or checkForSqueezeZone(resulting_high[1]) 
+//  or checkForSqueezeZone(resulting_low[1]) 
+//  or checkForSqueezeZone(resulting_close[2]) 
+//  or checkForSqueezeZone(resulting_close[3]) 
+//  or checkForSqueezeZone(resulting_close[4]) 
+//  or checkForSqueezeZone(resulting_close[5]) 
+//  or checkForSqueezeZone(resulting_close[6]) 
+//  or checkForSqueezeZone(resulting_close[7]) 
+//  or (
+//      returnOccuranceOfConditionBool('bool', lowBBWPhase, "==", 1, 10) > 0 
+//      and returnOccuranceOfConditionBool('bool', squeezeStartInsideLowBBWPhase, "==", 1, 10) > 0)
+//  )
+
+
+
+// and (sellDivergenceStatusShort == "intact" or sellDivergenceStatusShort == "completed")
+
+
+
+//    if confirmedBBBreakout('bot', bollinger_bot) and ((close[1] < higherSqueezeZone and close[1] > lowerSqueezeZone) or (high[1] < higherSqueezeZone and high[1] > lowerSqueezeZone)  or (low[1] < higherSqueezeZone and low[1] > lowerSqueezeZone)or (returnOccuranceOfConditionBool('bool', lowBBWPhase, "==", 1, 10) > 0 and returnOccuranceOfConditionBool('bool', squeezeStartInsideLowBBWPhase, "==", 1, 10) > 0)) and (sellDivergenceIntact or sellDivergenceCompleted)
+    if not extreme_volatility and returnOccuranceOfConditionString("string", slowSmmaTrend, "==", "down", 2) > 1 and confirmedBBBreakout('bot', bollinger_bot_short) and resulting_close < lower_linreg and (checkForSqueezeZone(resulting_close[1]) or checkForSqueezeZone(resulting_high[1]) or checkForSqueezeZone(resulting_low[1]) or checkForSqueezeZone(resulting_close[2]) or checkForSqueezeZone(resulting_close[3]) or checkForSqueezeZone(resulting_close[4]) or checkForSqueezeZone(resulting_close[5]) or checkForSqueezeZone(resulting_close[6]) or checkForSqueezeZone(resulting_close[7]) or (returnOccuranceOfConditionBool('bool', lowBBWPhase, "==", 1, 10) > 0 and returnOccuranceOfConditionBool('bool', squeezeStartInsideLowBBWPhase, "==", 1, 10) > 0))// and (sellDivergenceStatusShort == "intact" or sellDivergenceStatusShort == "completed")
+        squeeze_started := false
+        //if returnOccuranceOfCondition("float", bbw, "<", VLI_slow, 20) > 15 and returnOccuranceOfCondition("float", bbw, "<", VLI_fast, 20) > 15
+        array.push(shortSignals, "B-Methode 1")
+        //if sellDivergenceConfirmed and sellDivergenceIntact
+        //    array.push(shortSignals, "B-Methode 1")
+        
+        
+    //if ta.crossover(close, bollinger_top) and squeeze_started
+    if returnOccuranceOfConditionString("string", slowSmmaTrend, "==", "up", 2) > 1 and confirmedBBBreakout('top', bollinger_top) and (checkForSqueezeZone(close[1]) or checkForSqueezeZone(resulting_high[1]) or checkForSqueezeZone(resulting_low[1]) or checkForSqueezeZone(resulting_close[2]) or checkForSqueezeZone(resulting_close[3]) or checkForSqueezeZone(resulting_close[4]) or checkForSqueezeZone(resulting_close[5]) or checkForSqueezeZone(resulting_close[6]) or checkForSqueezeZone(resulting_close[7]) or (returnOccuranceOfConditionBool('bool', lowBBWPhase, "==", 1, 10) > 0 and returnOccuranceOfConditionBool('bool', squeezeStartInsideLowBBWPhase, "==", 1, 10) > 0))// and (sellDivergenceStatusShort == "intact"  or sellDivergenceStatusShort == "completed")
+    //if confirmedBBBreakout('top', bollinger_top) and squeeze_started
+        array.push(longSignals, "B-Methode 1")
+        squeeze_started := false
+        
+    // Squeeze Outbreak
+//    if ta.crossunder(close, lowerSqueezeZone)// and (sellDivergenceIntact or sellDivergenceCompleted)
+//        array.push(shortSignals, "Squeeze Outbreak")
+
+    // Long
+    // ----
+    
+    
+    
+    // vwmacd
+//    if (ta.crossover(vwmacd_vwmacd, signal_vwmacd))
+//        array.push(longSignals, "vwmacd")
+    
+    //SAR
+//    if (sarLongEntry)
+//        array.push(longSignals, "SAR")
+        
+    // 4-Wochen-Regel
+    if (close > hh4w[1])
+        array.push(longSignals, "4-Wochen-Regel")
+        ll4w_trend := "kaufen"
+        if (ll4w_trend[1] != ll4w_trend)
+            ll4w_trendchange := true
+
+    //  buy-div-reneval
+//    if (array.includes(longSignals, "4-Wochen-Regel") and ll4w_trendchange)
+//   array.push(longSignals, "buy-div-reneval")
+        
+//    if (array.includes(shortSignals, "4-Wochen-Regel") and ll4w_trendchange)
+        //sellDivergenceIntact := false   
+//     array.push(shortSignals, "sell-div-reneval")
+                            
+    //Murphy
+//    if (ta.crossover(smaDmacFast, smaDmacMid))
+//        array.push(longSignals, "Murphy")
+        
+        
+
+    //nls2
+    
+    //if CrossDown Bollinger Top and vol_condition:
+//    if close of price > sma_fast(per 20):
+//        if BBW < VLI_top:
+//            if low_volatility_level:
+//                if sma_mid (per 50) > sma_veryslow (per 200):
+//                    long
+//            elseif not sma_veryslow > sma_slow > sma_mid : ( # h i g h v o l a t i l i t y l e v e l )
+//                long
+//        elseif sma_slow (per 100) > sma_veryslow (per 200):
+//            long
+//            stoploss at: low of last candle
+//            if trade profitover 3% add stop win at 1%
+
+//if CrossDown Bollinger Bot and vol_condition:
+//    close
+//# stoploss and stopwin like in Long 5
+
+//stoploss: at 5% below low of entrycandle
+//stopwin: if tradeprofit over 20% add stopwin at 15%
+//if tradeprofit over 25% add stopwin at 20%
+//if tradeprofit over 30% add stopwin at 25%
+//if tradeprofit over 35% add stopwin at 30%
+//if tradeprofit over 40% add stopwin at 35% 
+
+// original version
+    if (resulting_close > bollinger_top and resulting_close > upper_linreg and VLI_top)// and not atrRangeCond) // 1 vol_condition and VLI_top and 
+    //if (ta.crossover(close, bollinger_top) and VLI_top)// and not atrRangeCond) // 1 vol_condition and VLI_top and 
+    
+    //if (confirmedBBBreakout('top', bollinger_top) and VLI_top)// and not atrRangeCond) // 1 vol_condition and VLI_top and 
+    //if (not (strategy.position_size < 0) and ta.crossunder(close, bollinger_top) and VLI_top) // vol_condition and VLI_top and
+        if (resulting_close > sma_mid) // 2
+            if (bbw < VLI_top) // 3
+                if (low_volatility_level) // 4
+                    if (sma_mid > sma_veryslow) // 5
+                        array.push(longSignals, "nls2")
+                        array.push(longSignals, "broad1")      
+        //else if (high_volatility_level) // dürfte es entsprechend dem Kommentar "# high volatility" sein
+        //else if (not high_volatility_level)
+        //else if (sma_mid > sma_slow and sma_mid > sma_veryslow)
+        //else if (sma_mid > sma_slow or sma_slow > sma_veryslow)
+        //else if (sma_mid > sma_veryslow)
+                else if (sma_mid > sma_slow)
+                    array.push(longSignals, "nls2")
+                    array.push(longSignals, "broad1")
+        //else if (not high_volatility_level)        
+        //else if (sma_slow > sma_veryslow) // 6
+        else if (sma_mid > sma_veryslow) // 6
+            array.push(longSignals, "nls2")
+            array.push(longSignals, "tight")
+                
+                
+// nls2 fast version     
+    //if (close > bollinger_top and VLI_top)// and not atrRangeCond) // 1 vol_condition and VLI_top and 
+    //    array.push(longSignals, "nls2")
+    //    if returnOccuranceOfConditionString("string", vwmaTrend, "==", "up", 10) > 9
+    //        array.push(longSignals, "broad1")
+    //    else
+    //        array.push(longSignals, "tight")
+                
+                
+                
+                
+                
+                
+                
+                
+        
+    // BB mean reversion
+//    if (ta.crossunder(resulting_close, bollinger_bot))
+//        array.push(longSignals, "BB mean reversion")
+        
+    // BB mean div
+    //if (returnOccuranceOfConditionBool("bool", array_includes(longSignals, "BB mean reversion"), "==", 1, 25) > 1) 
+    //    if (occuranceBuyDivergenceLong > 1 and occuranceBuyDivergence3MultLong > 2 and occuranceSellDivergenceLong < 1 and occuranceSellDivergence3MultLong < 2)
+    //        array.push(longSignals, "BB mean div")
+        
+    // BB gimmee bar
+    //if (close > bollinger_bot and low < bollinger_bot and high < bollinger_basis)
+    //    array.push(longSignals, "BB gimmee bar")
+        
+    // BB cross mid
+    //if (ta.crossover(close, bollinger_basis))
+    //    array.push(longSignals, "BB cross mid")
+                
+    // RSI
+//    if (ta.crossover(ta.rsi(resulting_close, 14), 30) and returnOccuranceOfCondition("float", ta.rsi(resulting_close, 14), "<", 25, 10) > 1) 
+//        array.push(longSignals, "RSI")
+        
+    // RSI and divergences
+//    if (array_includes(longSignals, "4-Wochen-Regel") or array_includes(longSignals, "buy-div-reneval")) // or ta.crossunder(close, bollinger_bot)) 
+//        if (buyDivergenceIntactLong)
+//           array.push(longSignals, "RSI and divergences")
+            //buyDivergenceIntact := true
+            //buyDivergence := true
+            //buyDivergenceClosePrice := close
+            
+    // ultra-divs
+    //if (array_includes(longSignals, "4-Wochen-Regel") or array_includes(longSignals, "buy-div-reneval")) // or ta.crossunder(close, bollinger_bot)) 
+    //    if (occuranceBuyDivergence10MultLong > 2 and occuranceBuyDivergence3MultLong > 1 and occuranceBuyDivergenceLong and occuranceSellDivergence10MultLong < 1)
+    //       array.push(longSignals, "ultra-divs")
+            //buyDivergenceIntact := true
+            //buyDivergence := true
+            //buyDivergenceClosePrice := close       
+            
+    // RSIdiv adxlong
+    //if (returnOccuranceOfConditionBool("bool", array_includes(longSignals, "RSI"), "==", 1, 25) > 3 or ta.crossunder(close, bollinger_bot)) 
+    //    if (occuranceBuyDivergenceLong > 1 and occuranceSellDivergence3MultLong < 1)
+    //        array.push(longSignals, "RSIdiv adxlong")
+            
+    // MFI
+//    if (ta.crossover(ta.mfi(resulting_close, 14), 30) and returnOccuranceOfCondition("float", ta.mfi(resulting_close, 14), "<", 30, 10) > 1)
+//        array.push(longSignals, "MFI")
+    
+    // mean reversion
+    //if (ta.crossover(close, bollinger_top))
+    //    array.push(longSignals, "BB mean reversion")
+
+    // BB gimmee bar                
+//    if (close < bollinger_top and resulting_high > bollinger_bot and resulting_low > bollinger_basis)
+//        array.push(longSignals, "BB gimmee bar")
+        
+    // StochRSI
+    //if (ta.crossover(StochRSIK, StochRSID) and StochRSIK < 20)
+    //    array.push(longSignals, "StochRSI")    
+        
+    // StochRSI and CVD
+    //if (ta.crossover(StochRSIK, StochRSID) and StochRSIK < 25 and ta.rising(cvdMa, 5))
+    //    array.push(longSignals, "StochRSI and CVD")  
+        
+    // Stochastic
+    //if (ta.crossover(Stochk, 20) and extreme_low_volatility_level)
+    //    array.push(longSignals, "Stochastic") 
+        
+    // momentum
+    //if (ta.crossover(momentum, 0))
+    //    array.push(longSignals, "momentum")
+        
+    // AMA
+//    if (ama > ama[1] and ADXBaba > 20 and ADXBaba < 50)
+//        array.push(longSignals, "AMA")
+        
+    // Sideways RSI
+//    if (ta.crossover(resulting_close, bollinger_bot))
+//        array.push(longSignals, "Sideways RSI")
+        
+    // utra-ma   
+    // ultra vwma wechsel nach langer fast grüner Periode
+    // und hohes volumen
+    // etw 1.5 Monate 1080 Stunden  Beobachtungsperiode, weniger als 5% rote Kerzen erlaubt
+    //if (returnOccuranceOfConditionString("string", smmaTrend, "==", "down", 1080) > 990) and smmaTrend == "up"
+        // wenn differenz von hh und ll der letzen 1.5 monate höher als 20% ist
+    //    if (ta.highest(1080) - ta.lowest(1080) > ta.highest(1080) / 5)
+            //????
+    //        array.push(shortSignals, "utra-ma")
+            
+    // trend-div-breakout
+//    if (lastSellDivergenceAgeLong > 300)
+//        lastSellDivergenceAgeLong := 300
+//    if (lastSellDivergenceAgeLong > 0 and returnOccuranceOfConditionString("string", vwmaTrend, "==", "up", lastSellDivergenceAgeLong + 24) == lastSellDivergenceAgeLong + 24 and (sellDivergenceIntactLong == false and sellDivergenceIntactLong[1] == true and sellDivergenceOvercomeLong))
+//       array.push(longSignals, "trend-div-breakout")
+        
+    // div confirmed
+//    if (buyDivergenceConfirmedLong == true and buyDivergenceConfirmedLong[1] == false and buyDivergenceIntactLong[1])
+//        array.push(longSignals, "div confirmed")
+                        
+    // ----------------                     
+    // Close Conditions
+    // ----------------
+    
+    // Short
+    // -----
+    
+    // vwmacd
+    //if (ta.crossover(vwmacd_vwmacd, signal_vwmacd))
+    //    array.push(shortCloseSignals, "vwmacd")
+        
+    // adx-di-cross
+    if (returnOccuranceOfCondition("float", DIP240, "<", DIN240, 12) > 11 and DIP240 > DIN240)
+    // Änderung nach live 6.3.22
+    //if (returnOccuranceOfCondition("float", DIPlus, "<", DIMinus, 12) > 11 and DIPlus > DIMinus)
+        array.push(shortCloseSignals, "adx-di-cross")
+        
+    // smma trend end
+    if returnOccuranceOfConditionString("string", smmaTrendShort, "==", "down", 96) > 95 and smmaTrendShort == "up"
+        array.push(shortCloseSignals, "smma trend end")
+        smmaTrendEndSignalShort := true
+    else
+        smmaTrendEndSignalShort := false
+    
+    // Murphy
+//    if (ta.crossover(smaDmacFast, smaDmacMid))  
+//        array.push(shortCloseSignals, "Murphy")
+    
+    // short 4
+//    if ta.crossover(resulting_close, bollinger_top_short) and vol_condition
+//        array.push(shortCloseSignals, "short 4")
+    
+    // BB mean reversion    
+    //if (ta.crossunder(close, bollinger_bot))
+    //    array.push(shortCloseSignals, "BB mean revesion")
+
+    // B-Methode 1
+    //if lowBBWPhase or (not sellDivergenceIntact and sellDivergenceIntact[1] and not sellDivergenceConfirmed and sellDivergenceConfirmed[1] and not sellDivergenceCompleted)
+    // Änderung nach live 6.3.22
+    if ta.crossover(resulting_close, bollinger_basis)
+    //if confirmedBBBreakout('top', bollinger_basis)
+    //if close > (entryPriceShort * stopLossMultShort)
+        //array.push(shortCloseSignals, "B-Methode 1_SAR")
+        array.push(shortCloseSignals, "B-Methode 1")
+        
+    // Änderung nach live 6.3.22
+    //if ta.crossover(close, bollinger_top)
+    //    array.push(shortCloseSignals, "B-Methode 1")
+
+    // nls2
+    if ta.crossover(resulting_close, bollinger_top_short) and vol_condition
+        array.push(shortCloseSignals, "nls2") 
+        
+    if (confirmedBBBreakout('top', bollinger_top) and vol_condition)// or array.includes(longCloseSignals, "adx-di-cross")
+        array.push(shortCloseSignals, "nls2 confirmed")
+        
+    if tradeAgeShort > 23 and resulting_close < (entryPriceShort * 0.98) and returnOccuranceOfCondition("float", resulting_close, "<", bollinger_basis_short, 24) > 22 and ta.crossover(resulting_close, bollinger_basis_short)
+        array.push(shortCloseSignals, "breakout")
+        
+    // recht gut
+    // recht gut im alten timeframe und mit hohem shortloss und take profit03
+    //if (close > bollinger_top)
+    //    array.push(shortCloseSignals, "recht gut")
+     
+    // RSI
+//    if (ta.crossover(ta.rsi(resulting_close, 14), 30) and returnOccuranceOfCondition("float", ta.rsi(resulting_close, 14), "<", 25, 10) > 1)
+//        array.push(shortCloseSignals, "RSI")
+        
+    // MFI
+    //if (ta.crossover(ta.mfi(close, 14), 30) and returnOccuranceOfCondition("float", ta.mfi(close, 14), "<", 30, 10) > 1)
+    //    array.push(shortCloseSignals, "MFI") 
+        
+    // SAR
+    //if (sarLongEntry)
+    //    array.push(shortCloseSignals, "SAR")
+        
+    // momentum
+    //if (ta.crossover(momentum, 0))
+    //    array.push(shortCloseSignals, "momentum") 
+        
+    // divergences
+    //if (returnOccuranceOfConditionBool("bool", buyDivergence, "==", 1, 10) > 0)
+    //    array.push(shortCloseSignals, "divergences")
+        
+    // AMA
+    //if (ama > ama[1])
+    //    array.push(shortCloseSignals, "AMA")
+        
+    // 4-Wochen-Regel
+    //if (close > hh4w[1])
+    //    array.push(shortCloseSignals, "4-Wochen-Regel")
+        
+    // 4-Wochen-Regel
+    if (shortCloseMethod == "4-Wochen-Regel" and tradeMethodShort == "4-Wochen-Regel")
+        stopLossPriceShort := hh4w[1]
+        if (resulting_close > hh4w[1])
+            array.push(shortCloseSignals, "4-Wochen-Regel")
+        
+    // Sideways RSI
+//    if (ta.crossunder(resulting_close, bollinger_basis_short))
+//        array.push(shortCloseSignals, "Sideways RSI")
+        
+    // 4-Wochen-Regel
+//    if (resulting_close > hh4w[1])
+//        array.push(shortCloseSignals, "4-Wochen-Regel")
+        
+    // div rebound
+//    if (sellDivergenceStatusShort[1] == "intact" and sellDivergenceStatusShort == "intact")
+//        array.push(shortCloseSignals, "div rebound")
+        
+    //if (tradeAgeShort > 14 and sellDivergenceConfirmed == false )
+    //    array.push(shortCloseSignals, "div rebound")
+        
+    // div rebound unconfirmed
+//    if (tradeAgeShort > 17 and sellDivergenceConfirmedShort == false )
+//        array.push(shortCloseSignals, "div rebound unconfirmed")
+        
+    // div confirmed 
+    //if (buyDivergenceIntact == false and buyDivergenceIntact[1] == true and buyDivergenceConfirmed[1] == true or ((array.includes(longCloseSignals, "adx-di-cross") or array.includes(longCloseSignals, "breakout")))) 
+    //  array.push(longCloseSignals, "div confirmed")
+    //if ((sellDivergenceIntactShort == false and sellDivergenceIntactShort[1] == true and array.get(divStringArrShort, sellDivergenceStatusArrayIndex)[1] == "confirmed" and array.get(divStringArrShort, sellDivergenceStatusArrayIndex) != "completed") or array.get(divStringArrShort, buyDivergenceStatusArrayIndex) == "confirmed")// or array.includes(shortCloseSignals, "adx-di-cross")) 
+    if (sellDivergenceIntactShortExit == false and sellDivergenceIntactShortExit[1] == true)  
+        array.push(shortCloseSignals, "div confirmed")
+        
+    //if ((sellDivergenceIntact == false and sellDivergenceIntact[1] == true and sellDivergenceConfirmed[1] == true) or buyDivergenceConfirmed == true or array.includes(shortCloseSignals, "adx-di-cross")) 
+    //ta.crossover(close, bollinger_bot) or
+//    if (tradeAgeShort > 2 and (ta.crossover(resulting_close, bollinger_bot_short) or confirmedBBBreakout('top', bollinger_top))) or ((sellDivergenceIntactShort == false and sellDivergenceIntactShort[1] == true and sellDivergenceConfirmedShort[1] == true) or buyDivergenceConfirmedShort == true or array.includes(shortCloseSignals, "adx-di-cross")) 
+//        array.push(shortCloseSignals, "div confirmed fast")
+        
+    //if (array.includes(longSignals, "4-Wochen-Regel"))
+    //    array.push(shortCloseSignals, "div confirmed")
+
+    // Long
+    // ----
+    
+    // vwmacd
+    //if (ta.crossunder(vwmacd_vwmacd, signal_vwmacd))
+    //    array.push(longCloseSignals, "vwmacd")
+        
+    // Murphy
+    //if (ta.crossunder(smaDmacFast, smaDmacMid))  
+    //    array.push(longCloseSignals, "Murphy")
+        
+    // adx-di-cross
+    if (returnOccuranceOfCondition("float", DIPlusIntval, ">", DIMinusIntval, 24) > 22 and DIPlusIntval < DIMinusIntval)
+        array.push(longCloseSignals, "adx-di-cross")
+    
+    // nls2        
+    if (ta.crossunder(resulting_close, bollinger_bot_short) and vol_condition)// or array.includes(longCloseSignals, "adx-di-cross")
+        array.push(longCloseSignals, "nls2")
+        
+    if (confirmedBBBreakout('bot', bollinger_bot) and vol_condition)// or array.includes(longCloseSignals, "adx-di-cross")
+        array.push(longCloseSignals, "nls2 confirmed")
+        
+    
+    if (returnOccuranceOfCondition("float", resulting_close, ">", bollinger_basis, 24) > 22 and ta.crossunder(resulting_close, bollinger_basis))
+        array.push(longCloseSignals, "breakout")
+        
+    // RSI
+//    if (ta.crossunder(ta.rsi(resulting_close, 14), 70) and returnOccuranceOfCondition("float", ta.rsi(resulting_close, 14), ">", 75, 10) > 1)
+//        array.push(longCloseSignals, "RSI")
+        
+    // smma trend end
+    if returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 96) > 95 and smmaTrend == "down"
+        array.push(longCloseSignals, "smma trend end")
+        smmaTrendEndSignalLong := true
+    else
+        smmaTrendEndSignalLong := false
+        
+    // MFI
+    //if (ta.crossunder(ta.mfi(close, 14), 70) and returnOccuranceOfCondition("float", ta.mfi(close, 14), ">", 70, 10) > 1)
+    //    array.push(longCloseSignals, "MFI")
+        
+    // sidewaysLong
+    //if (ta.crossover(close, bollinger_top))
+    //    array.push(longCloseSignals, "sidewaysLong")
+        
+    // "BB gimmee bar" 
+    //if (ta.crossover(close, bollinger_top))
+    //    array.push(longCloseSignals, "BB gimmee bar")
+        
+    // "BB mean reversion"       
+    //if (ta.crossover(close, bollinger_top) or ta.crossunder(close, bollinger_basis))
+    //   array.push(longCloseSignals, "BB mean reversion")
+        
+    // BB cross mid
+    //if (ta.crossover(close, bollinger_top))
+    //    array.push(longCloseSignals, "BB cross mid")
+        
+    // StochRSI and CVD        
+    //if (StochRSIK > 75)
+    //    array.push(longCloseSignals, "StochRSI and CVD")  
+        
+    // StochRSI
+    //if (ta.crossunder(StochRSIK, StochRSID) and StochRSIK > 80)
+    //    array.push(longCloseSignals, "StochRSI")    
+        
+    // Stochastic
+    //if (ta.crossunder(Stochk, 80))
+    //    array.push(longCloseSignals, "Stochastic")    
+        
+    // momentum
+    //if (ta.crossunder(momentum, 0))
+    //    array.push(longCloseSignals, "momentum") 
+        
+    // divergences
+    //if (returnOccuranceOfConditionBool("bool", sellDivergence, "==", 1, 10) > 0)
+    //    array.push(longCloseSignals, "divergences") 
+        
+    // AMA
+    //if (ama < ama[1])
+    //    array.push(longCloseSignals, "AMA")
+        
+    // 4-Wochen-Regel
+    if (longCloseMethod == "4-Wochen-Regel" and tradeMethodLong == "4-Wochen-Regel")
+        stopLossPriceLong := ll4w[1]
+        
+    //if (close < ll4w[1])
+    //    array.push(longCloseSignals, "4-Wochen-Regel")
+    
+    // Sideways RSI
+//    if (ta.crossover(resulting_close, bollinger_basis))
+//        array.push(longCloseSignals, "Sideways RSI")
+    
+    // 4-Wochen-Regel
+    if (resulting_close < ll4w[1])
+        array.push(longCloseSignals, "4-Wochen-Regel") 
+        
+    // div rebound
+//    if (buyDivergenceRejectedLong)
+//        array.push(longCloseSignals, "div rebound")
+        
+    //if (tradeAgeShort > 14 and sellDivergenceConfirmed == false )
+    //    array.push(longCloseSignals, "div rebound")
+        
+    // trend-div-breakout
+//    if (returnOccuranceOfConditionString("string", vwmaTrend, "==", "down", 5) > 4 or sellDivergenceConfirmedLong or ((array.includes(longCloseSignals, "adx-di-cross") or array.includes(longCloseSignals, "breakout")))) //or array.includes(longCloseSignals, "4-Wochen-Regel")
+//        array.push(longCloseSignals, "trend-div-breakout")
+        
+    // div confirmed 
+    
+    //tradeAgeLong > 20 and close > entryPriceLong and 
+//    if buyDivergenceCompletedLong == false and buyDivergenceCompletedLong[1] == true //and buyDivergenceConfirmedLong[1] == true and not buyDivergenceConfirmedLong //or ((array.includes(longCloseSignals, "adx-di-cross") or array.includes(longCloseSignals, "breakout")))) 
+//        array.push(longCloseSignals, "div confirmed")
+        
+    // B-Methode 1
+    //if lowBBWPhase or (not sellDivergenceIntact and sellDivergenceIntact[1] and not sellDivergenceConfirmed and sellDivergenceConfirmed[1] and not sellDivergenceCompleted)
+    if ta.crossunder(resulting_close, bollinger_basis)
+        array.push(longCloseSignals, "B-Methode 1")
+    // ---------------------
+    // Processing Final Trade Signals
+    // ---------------------
+    // Logic for combination of the various checks and dropdowns, 
+    // trends aso with the signals of the strategies and return of 
+    // the actual trading signals shortEntry and longEntry, 
+    // shortClose, longClose
+    // ---------------------
+    
+    // tight / broad problem      
+        
+    //tightTakeProfitStartPercLong = 0.03
+    //tightTakeProfitPercLong = 0.01
+    tightStopLossMultLong = 0.01
+    
+    // nls2 original
+    //broad1TakeProfitStartPercLong = 0.20
+    //broad1TakeProfitPercLong = 0.05
+    //broad1StopLossMultLong = 0.05
+    
+    //broad2TakeProfitStartPercLong = 0.20
+    //broad2TakeProfitPercLong = 0.05
+    //broad2StopLossMultLong = 0.05
+    
+    //1900 % bnb
+    //broad1TakeProfitStartPercLong = 0.10
+    //broad1TakeProfitPercLong = 0.03
+    //broad1StopLossMultLong = 0.05
+    
+    //broad2TakeProfitStartPercLong = 0.25
+    //broad2TakeProfitPercLong = 0.05
+    //broad2StopLossMultLong = 0.1
+    
+    //broad1TakeProfitStartPercLong = 0.20
+    //broad1TakeProfitPercLong = 0.05
+    //broad1StopLossMultLong = 0.1
+    
+    //broad2TakeProfitStartPercLong = 0.15
+    //broad2TakeProfitPercLong = 0.04
+    //broad2StopLossMultLong = 0.05
+    
+    // abgeschaltet
+    //broad1TakeProfitStartPercLong = 2000000
+    //broad1TakeProfitPercLong = 5000
+    //broad1StopLossMultLong = 0.05
+    
+    //broad2TakeProfitStartPercLong = 2000000
+    //broad2TakeProfitPercLong = 5000
+    //broad2StopLossMultLong = 0.05
+    
+    //broad3TakeProfitStartPercLong = 2000000
+    //broad3TakeProfitPercLong = 5000
+    //broad3StopLossMultLong = 0.05
+    
+    
+    //tightTakeProfitStartPercShort = 3 / 100
+    //tightTakeProfitPercShort = 1 / 100
+    tightStopLossMultShort = 0.01
+    
+    //broad2TakeProfitStartPercShort = 10 / 100
+    //broad2TakeProfitPercShort = 4 / 100
+    //broad2StopLossMultShort = 1.04
+    
+    // ---------------------
+    // Entries Common
+    // ---------------------
+    
+    // Short and Cooldown
+    // -----
+    
+    //if useShort
+        
+    // smmaTrend Check
+    // ---------------
+
+    adx_trend = "neutral"
+    
+    //if (useSMMATrendShort == false or (useSMMATrendShort == true and smmaTrend == "down" and smmaTrend[1] == "down" and smmaTrend[2] == "down" and smmaTrend[3] == "down" and smmaTrend[4] == "down" and smmaTrend[5] == "down"))
+    
+    if (useSMMATrendShort == false or (useSMMATrendShort == true and returnOccuranceOfConditionString("string", smmaTrendShort, "==", "down", 2) > 1))
+        
+        // ADX, AtrRange Check
+        // ---------------    
+        
+        if (useAdx == false or (adx_trend == "verkaufen" and useAdx == true)) and (useAtrRangeCondShort == false or (useAtrRangeCondShort == true and not atrRangeCond))
+            
+            // Volume Check
+            // --------------- 
+            
+            if (useVolumeCondForShortEntry == false or (vol_condition and useVolumeCondForShortEntry == true))
+            
+                // Divergence Check
+                // --------------- 
+                
+                //if (useDivergenceCheckShort == false or (useDivergenceCheckShort == true and (returnOccuranceOfConditionBool("bool", buyDivergenceIntactShortEntry, "==", 1, periodForDivergenceCheckShort) < 1) or sellDivergenceIntactShortEntry))
+                if (useDivergenceCheckShort == false or (useDivergenceCheckShort == true  and buyDivergenceIntactShortEntry == false))
+                    // Check if actual method is sending in this candel
+                    // ---------------
+                    
+                    if (array_includes(shortSignals, shortMethod))
+                    
+                        // Verhalten bei wiederkehrenden Signalen
+                        // ---------------
+                        
+                        //if (useAdjustStopLossOnRecurringSignalsShort == true or (useAdjustStopLossOnRecurringSignalsShort == false and (strategy.position_size == 0.0 or strategy.position_size > 0 or (strategy.position_size < 0 and tradeType != "short")))) 
+                        
+                        if (useShort)
+                            shortEntry := true
+                            stopLossPriceShort := resulting_close * stopLossMultShort
+                            tradeMethodShort := shortMethod
+                            tradeType := "short"
+                        else
+                            shortEntrySignalDespiteDeactivated := true
+                        
+    
+    // Long, cooldown of 5
+    // ---------------
+    
+    if useLong
+        
+        // smmaTrend Check
+        // ---------------
+        
+        if (useSMMATrendLong == false or (useSMMATrendLong == true and returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 2) > 1))
+            
+            // ADX Check, AtrRange Check
+            // ---------------    
+            
+            if (useAdx == false or (adx_trend == "kaufen" and useAdx == true)) and (useAtrRangeCondLong == false or (useAtrRangeCondLong == true and not atrRangeCond))
+                
+                // Volume Check
+                // --------------- 
+                
+                if (useVolumeCondForLongEntry == false or (vol_condition and useVolumeCondForLongEntry == true))
+                
+                    // Divergence Check
+                    // --------------- 
+                    
+                    if (useDivergenceCheckLong == false or (useDivergenceCheckLong == true  and sellDivergenceIntactLongEntry == false))
+                    
+                        // Check if actual method is sending in this candel
+                        // ---------------
+                        
+                        if (array_includes(longSignals, longMethod))
+                            longEntry := true
+                            stopLossPriceLong := resulting_close * stopLossMultLong
+                            tradeMethodLong := longMethod
+                            tradeType := "long"
+    
+    // Sideways Short
+    // --------------
+    
+//    if useSidewaysShort and (useDontOpenIfTheresALongPositionSidewaysShort == false or (useDontOpenIfTheresALongPositionSidewaysShort == true and tradeType != "long"))
+    
+        // dont open if theres a long position
+        // ---------------
+    
+        //if 
+        
+        // smmaTrend Check
+        // ---------------
+        
+//        if (useSMMATrendSidewaysShort == false) or (useSMMATrendSidewaysShort == true and returnOccuranceOfConditionString("string", smmaTrendShort, "==", "down", 5) > 4)
+            
+            // ADX and RAVI Check
+            // ---------------    
+            
+//            if (useOverrideADXBehaviorSidewaysShort == "-") or (useOverrideADXBehaviorSidewaysShort != "asDerivedFromADX" and useOverrideADXBehaviorSidewaysShort != "-" and adx_trend == useOverrideADXBehaviorSidewaysShort) or ((adx_trend == "seitwaerts" or adx_trend == "neutral") and useAdx == true and useOverrideADXBehaviorSidewaysShort == "asDerivedFromADX") and (useRAVIForEntriesSidewaysShort == false or (useRAVIForEntriesSidewaysShort == true and ravi_trend == "seitwaerts")) 
+                
+                // Volume Check
+                // --------------- 
+                
+//                if (useVolumeCondForSidewaysShortEntry == false or (vol_condition and useVolumeCondForSidewaysShortEntry == true))
+                
+                    // Divergence Check
+                    // --------------- 
+                        
+//                    if (useDivergenceCheckSidewaysShort == false or (useDivergenceCheckSidewaysShort == true and returnOccuranceOfConditionBool("bool", buyDivergenceIntactSidewaysShort, "==", 1, periodForDivergenceCheckSidewaysLong) < 1))
+                    
+                        // Check if actual method is sending in this candel
+                        // ---------------
+                        
+//                        if (array_includes(shortSignals, sidewaysShortMethod))
+//                            shortEntry := true
+//                            stopLossPriceShort := resulting_close * stopLossMultSidewaysShort
+//                            tradeMethodShort := sidewaysShortMethod
+//                            tradeType := "sidewaysShort"
+    
+    // Sideways Long
+    // --------------
+    
+//    if useSidewaysLong and (useDontOpenIfTheresAShortPositionSidewaysLong == false or (useDontOpenIfTheresAShortPositionSidewaysLong == true and tradeType != "short"))
+    
+        // Cooldown Check todo
+        // ---------------
+        
+        //if (useCooldownSidewaysLong == false or (useCooldownSidewaysLong == true and not entryPriceSidewaysLong[cooldownCandlesSidewaysLong]))
+        
+        // dont open if theres a long position 
+        // ---------------
+    
+        //if (useDontOpenIfTheresAShortPositionSidewaysLong == false or (useDontOpenIfTheresAShortPositionSidewaysLong == true and tradeType != "short"))
+        
+        // smmaTrend Check
+        // ---------------
+        
+//        if (useSMMATrendSidewaysLong == false or (useSMMATrendSidewaysLong == true and returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 5) > 4))
+            
+            // ADX and RAVI Check
+            // ---------------    
+            
+//            if (useOverrideADXBehaviorSidewaysLong == "-") or (useOverrideADXBehaviorSidewaysLong != "asDerivedFromADX" and useOverrideADXBehaviorSidewaysLong != "-" and adx_trend == useOverrideADXBehaviorSidewaysLong) or ((adx_trend == "seitwaerts" or adx_trend == "neutral") and useAdx == true and useOverrideADXBehaviorSidewaysLong == "asDerivedFromADX") and (useRAVIForEntriesSidewaysLong == false or (useRAVIForEntriesSidewaysLong == true and ravi_trend == "seitwaerts")) 
+                
+                // Volume Check
+                // --------------- 
+                
+//                if (useVolumeCondForSidewaysLongEntry == false or (vol_condition and useVolumeCondForSidewaysLongEntry == true))
+                    
+                    // Divergence Check
+                    // --------------- 
+                        
+//                    if (useDivergenceCheckSidewaysLong == false or (useDivergenceCheckSidewaysLong == true and returnOccuranceOfConditionBool("bool", sellDivergenceIntactSidewaysLong, "==", 1, periodForDivergenceCheckSidewaysLong) < 1))
+                    
+                        // Check if actual method is sending in this candel
+                        // ---------------
+                        
+//                        if (array_includes(longSignals, sidewaysLongMethod))
+//                            longEntry := true
+//                            stopLossPriceLong := resulting_close * stopLossMultSidewaysLong
+//                            tradeMethodLong := sidewaysLongMethod
+//                            tradeType := "sidewaysLong"
+                        
+    // --------------------
+    // Closes
+    // -------------------- 
+    // Set the close flag if method is the actual trades tradeType and if close signal 
+    // is caught
+    // ----
+    
+    // Short
+    // ----
+    if (tradeMethodShort == shortMethod and tradeType == "short") and not shortEntry // or tradeMethodShort == "immediately")
+    
+        //if (useShortClose or (useSoftShortClose and tradeAgeShort < softCloseTradeAgeInBarsShort))
+        
+        if (useShortClose or (useSoftShortClose and ( ( (takeProfitPriceShort > 0 and resulting_close > takeProfitPriceShort) or takeProfitPriceShort < 0.000001) and (stopLossPriceShort > entryPriceShort) and (entryPriceShort < resulting_close)) or tradeAgeShort < softCloseTradeAgeInBarsShort))
+        
+            // Custom Entries behave different with closing
+            
+            if (tradeEntryIsCustomShort == false or (tradeEntryIsCustomShort == true and tradeMethodShort == "ultra-divs" and 2 == 1))
+        
+                if (array_includes(shortCloseSignals, shortCloseMethod))
+                
+                    shortCloseReason := shortCloseMethod
+                    shortClose := true
+                    
+                else if (array_includes(shortCloseSignals, shortCloseMethod + "_SAR"))
+                
+                    tradePutToSARShort := true
+    
+    // Long
+    // ----
+    
+    if (tradeMethodLong == longMethod and tradeType == "long")// or tradeMethodLong == "immediately")
+    
+        if (useLongClose or (useSoftLongClose and ( ( (takeProfitPriceLong > 0 and resulting_close < takeProfitPriceLong) or takeProfitPriceLong < 0.000001) and (stopLossPriceLong < entryPriceLong) and (entryPriceLong > resulting_close)) or tradeAgeLong < softCloseTradeAgeInBarsLong))
+        
+            // Custom Entries behave different with closing
+        
+            if (tradeEntryIsCustomLong == false or (tradeEntryIsCustomLong == true and tradeMethodLong == "ultra-divs" and 2 == 1))
+        
+                if (array_includes(longCloseSignals, longCloseMethod))
+                    
+                    longCloseReason := longCloseMethod
+                    longClose := true
+                
+        if (useCloseIfAdxTrendChangesLong and adx_trend != "kaufen")
+            
+            longCloseReason := "adx-change"
+            longClose := true
+        
+    // Sideways Short
+    // ----
+    
+//    if (tradeMethodShort == sidewaysShortMethod and tradeType == "sidewaysShort")
+    
+//        if (useSidewaysShortClose or (useSoftSidewaysShortClose and tradeAgeShort < softCloseTradeAgeInBarsSidewaysShort))
+    
+//            if (array_includes(shortCloseSignals, sidewaysShortCloseMethod))
+                
+//                shortCloseReason := sidewaysShortCloseMethod
+//                shortClose := true
+                
+    // Sideways Long
+    // ----
+    
+//    if (tradeMethodLong == sidewaysLongMethod and tradeType == "sidewaysLong" )
+    
+//        if (useSidewaysLongClose or (useSoftSidewaysLongClose and tradeAgeShort < softCloseTradeAgeInBarsSidewaysLong))
+    
+//            if (array_includes(longCloseSignals, sidewaysLongCloseMethod))
+                
+//                longCloseReason := sidewaysLongCloseMethod
+//                longClose := true
+                
+//        if (useCloseIfAdxTrendChangesSidewaysLong and adx_trend != "seitwaerts")
+            
+//            longCloseReason := "adx-change"
+//            longClose := true
+                
+    // --------------------
+    // Divergence Closes
+    // -------------------- 
+
+    // Short
+    // ----
+    if (tradeMethodShort == shortMethod and tradeType == "short")
+    
+        if (useDivergenceCheckToCloseShort) and (array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex)[1] == "intact" and (array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "confirmed" or array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "completed"))
+        
+            //buyDivergenceIntact := true
+            shortCloseReason := "divergences"
+            shortClose := true
+    
+    // Long
+    // ----
+    
+    if (tradeMethodLong == longMethod and tradeType == "long")
+    
+        if (useDivergenceCheckToCloseLong) and (array.get(divStringArrLongExit, sellDivergenceStatusArrayIndex)[1] == "intact" and (array.get(divStringArrLongExit, sellDivergenceStatusArrayIndex) == "confirmed" or array.get(divStringArrLongExit, sellDivergenceStatusArrayIndex) == "completed"))
+                    
+            //sellDivergenceIntact := true
+            longCloseReason := "divergences"
+            longClose := true
+            divergenceCloseLong := true
+        
+    // Sideways Short
+    // ----
+    
+//    if (tradeMethodShort == sidewaysShortMethod and tradeType == "sidewaysShort")
+    
+//        if (useDivergenceCheckToCloseSidewaysShort)
+    
+//            if (buyDivergenceConfirmedSidewaysShort and buyDivergenceConfirmedSidewaysShort[1] == false)
+                    
+                //buyDivergenceIntact := true
+//                shortCloseReason := "divergences"
+//                shortClose := true
+        
+    // Sideways Long
+    // ----
+    
+//    if (tradeMethodLong == sidewaysLongMethod and tradeType == "sidewaysLong")
+    
+//        if (useDivergenceCheckToCloseSidewaysLong)
+        
+//            if (sellDivergenceConfirmedSidewaysLong and sellDivergenceConfirmedSidewaysLong[1] == false)
+                    
+                //sellDivergenceIntact := true
+//                longCloseReason := "divergences"
+//                longClose := true
+                    
+    // ---------------------
+    // Custom Entries 
+    // ---------------------
+    
+    // ADX, wenn ADX trend wechselt starte Long und Short Positionen
+    // -----
+    
+//    if useLong and useImmediatelyPlaceOrderLong 
+//        
+//        if (useAdx == true and (adx_trend[21] == "seitwaerts" or adx_trend[21] == "verkaufen") and returnOccuranceOfConditionString("string", adx_trend, "==" , "kaufen", 20) > 19)
+//        
+//            longEntry := true
+//            if (tradeMethodLong == "none")
+//                stopLossPriceLong := resulting_close * 0.97
+//            tradeMethodLong := "immediately"
+//            tradeType := "long"
+    
+//    if useShort and useImmediatelyPlaceOrderShort 
+//        
+//        if (useAdx == true and (adx_trend[21] == "seitwaerts" or adx_trend[21] == "kaufen") and returnOccuranceOfConditionString("string", adx_trend, "==" , "verkaufen", 20) > 19)
+//        
+//            shortEntry := true
+//            if (tradeMethodShort == "none")
+//                stopLossPriceShort := resulting_close * 1.03
+//            tradeMethodShort := "immediately"
+//            tradeType := "short"
+    
+    // ---------------------
+    // Custom Closes 
+    // ---------------------
+            
+    // Wenn SMMA-Trend auf verkaufen wechselt
+    //if tradeMethodLong == "nls2" and tradeType == "long" and smmaTrend == "down"
+    //    longCloseReason := "smma down close"
+    //    longClose := true 
+    
+    if (((sidewaysShortCloseMethod == "B-Methode 1" or sidewaysShortCloseMethod == "nls2 long mirror" or sidewaysShortCloseMethod == "short 4" or sidewaysShortCloseMethod == "nls2" ) and tradeType == "sidewaysShort") or ((shortCloseMethod == "B-Methode 1" or shortCloseMethod == "nls2 long mirror" or shortCloseMethod == "short 4" or shortCloseMethod == "nls2" or shortCloseMethod == "nls2 confirmed" ) and tradeType == "short")) and (array.includes(shortCloseSignals, "adx-di-cross"))// or array.includes(shortCloseSignals, "4-Wochen-Regel"))// or array.includes(shortCloseSignals, "breakout")) //or array.includes(shortCloseSignals, "4-Wochen-Regel"))
+        shortCloseReason := "adx-di/4w"
+        shortClose := true 
+        
+    //if (((sidewaysShortCloseMethod == "B-Methode 1" or sidewaysShortCloseMethod == "nls2 long mirror" or sidewaysShortCloseMethod == "short 4" or sidewaysShortCloseMethod == "nls2" ) and tradeType == "sidewaysShort") or ((shortCloseMethod == "B-Methode 1" or shortCloseMethod == "nls2 long mirror" or shortCloseMethod == "short 4" or shortCloseMethod == "nls2" ) and tradeType == "short")) and array.includes(shortCloseSignals, "breakout") //and tradeAgeShort > 23 
+    //    shortCloseReason := "breakout"
+    //    shortClose := true 
+     
+    // ist mit nur schliessen wenn gewinn fhöher als 2%   
+    if (((sidewaysShortCloseMethod == "B-Methode 1" or sidewaysShortCloseMethod == "nls2 long mirror" or sidewaysShortCloseMethod == "short 4" or sidewaysShortCloseMethod == "nls2" ) and tradeType == "sidewaysShort") or ((shortCloseMethod == "B-Methode 1" or shortCloseMethod == "nls2 long mirror" or shortCloseMethod == "short 4" or shortCloseMethod == "nls2" or shortCloseMethod == "nls2 confirmed" ) and tradeType == "short")) and resulting_close < (entryPriceShort * 0.98) and tradeAgeShort > 48 and returnOccuranceOfConditionString("string", smmaTrendShort, "==", "down", 48) > 46 and smmaTrendShort == "up"
+        shortCloseReason := "smma trend"
+        shortClose := true 
+        
+    //if (((shortCloseMethod == "B-Methode 1") and tradeType == "sidewaysShort") or ((shortCloseMethod == "B-Methode 1") and tradeType == "short")) and close < (entryPriceShort * 0.98) and (tradeAgeShort > 48 and lowBBWPhase == true and lowBBWPhase[1] == false)
+    //    shortCloseReason := "lowBBWPhase"
+    //    shortClose := true 
+    
+    // Änderung nach live 6.3.22
+    if (((sidewaysLongCloseMethod == "B-Methode 1" or sidewaysLongCloseMethod == "nls2 long mirror" or sidewaysLongCloseMethod == "short 4" or sidewaysLongCloseMethod == "nls2" ) and tradeType == "sidewaysLong") or ((longCloseMethod == "B-Methode 1" or longCloseMethod == "nls2 long mirror" or longCloseMethod == "short 4" or longCloseMethod == "nls2"  or longCloseMethod == "nls2 confirmed") and tradeType == "long")) and array.includes(longCloseSignals, "adx-di-cross")
+        longCloseReason := "adx-di-cross"
+        longClose := true 
+    
+    if (((sidewaysLongCloseMethod == "B-Methode 1" or sidewaysLongCloseMethod == "nls2 long mirror" or sidewaysLongCloseMethod == "short 4" or sidewaysLongCloseMethod == "nls2" ) and tradeType == "sidewaysLong") or ((longCloseMethod == "B-Methode 1" or longCloseMethod == "nls2 long mirror" or longCloseMethod == "short 4" or longCloseMethod == "nls2"  or longCloseMethod == "nls2 confirmed") and tradeType == "long")) and tradeAgeLong > 48 and returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 48) > 46 and smmaTrend == "down"
+    // and resulting_close > entryPriceLong
+    
+    
+    //if (tradeMethodLong == "nls2" and tradeType == "long" and close > entryPriceLong and tradeAgeLong > 48 and returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 48) > 46 and smmaTrend == "down")
+        longCloseReason := "smma trend"
+        longClose := true 
+        
+    if tradeAgeLong > 23 and tradeType == "long" and array.includes(longCloseSignals, "breakout") and (useBBBasisCloseAfterBreakoutLong or tradeMethodLongTightOrBroad == "tight")
+        longCloseReason := "breakout"
+        longClose := true 
+        
+            
+    // Long 3. entry
+    // ---------------
+    
+    if useLongEntry3
+    
+        //returnOccuranceOfConditionString("string", smmaTrend, "==", "up", 5) > 4 and 
+        // returnOccuranceOfConditionBool("bool", sellDivergenceIntact, "==", 1, periodForDivergenceCheckLong) < 1 and 
+        if array_includes(longSignals, "div confirmed") and smmaTrend == "up" and smmaTrend[1] == "up" and smmaTrend[2] == "up"
+            longEntry := true
+            stopLossPriceLong := resulting_close * 0.97
+            tradeMethodLong := "div confirmed"
+            tradeType := "long3"
+            
+        if tradeMethodLong == "div confirmed" and tradeType == "long3" and array_includes(longCloseSignals, "div confirmed")
+            longCloseReason := "div confirmed"
+            longClose := true
+        
+    // ultra-divs
+    // -----
+    
+    //if useUltras
+    
+    //    if (array_includes(longSignals, "ultra-divs") or array_includes(longSignals, "ultra-ma"))
+            
+    //        longEntry := true
+    //        if (tradeMethodLong == "none")
+    //            stopLossPriceLong := close * 0.8
+    //        tradeMethodLong := "ultra-divs"
+    //        tradeEntryIsCustomLong := true
+    //        tradeType := "long"
+    //        undestroyableTradeLong := true
+                
+    //    if (array_includes(shortSignals, "ultra-divs") or array_includes(shortSignals, "ultra-ma"))
+            
+    //        shortEntry := true
+    //        if (tradeMethodShort == "none")
+    //            stopLossPriceShort := close * 1.2
+    //        tradeMethodShort := "ultra-divs"
+    //        tradeEntryIsCustomShort := true
+    //        tradeType := "short"
+    //        undestroyableTradeShort := true
+    
+        
+    
+    // --------------------
+    // Preparation of variables
+    // --------------------
+    
+    // Its not possible to nest more than env. 7 level of if conditions, 
+    // therefor additional processing needs to happen here for 
+    // example for the entry signal which consist of many levels
+    // --------------------
+    
+//    if shortEntry 
+//        if (tradeType == "sidewaysShort" and tradeMethodShort == "div confirmed")
+            //customTrailStartPercShort := 100 / (close / (ta.highest(bbw_price, 300) / 2))
+            //customTrailPercShort := 1.1
+//            stopLossPriceShort := array.get(divArrShort, sellDivergenceClosePriceArrayIndex) * 0.99
+    
+    //if longEntry            
+    if (tradeMethodLong == "nls2")
+
+    //    if array_includes(longSignals, "broad2")
+            //stopLossPriceLong := close * (1 - broad2StopLossMultLong)
+    //        stopLossPriceLong := close * (1 - stopLossMultLong)
+    //    else if array_includes(longSignals, "broad1")
+            //stopLossPriceLong := close * (1 - broad1StopLossMultLong)
+    //        stopLossPriceLong := close * (1 - stopLossMultLong)
+    //    else if array_includes(longSignals, "broad3")
+            //stopLossPriceLong := close * (1 - broad3StopLossMultLong)
+    //        stopLossPriceLong := close * (1 - stopLossMultLong)
+        //stopLossPriceLong := low[1] * stopLossMultLong
+        if (array_includes(longSignals, "tight"))
+        //stopLossPriceLong := low_of_last_candle
+            stopLossPriceLong := resulting_close * (1 - tightStopLossMultLong)
+            
+        //stopLossPriceLong := devLong * bbr
+        
+    if (sidewaysLongMethod == "nls2")
+    
+        if array_includes(longSignals, "broad2")
+            //stopLossPriceLong := close * (1 - broad2StopLossMultLong)
+            stopLossPriceLong := resulting_close * (1 - stopLossMultLong)
+        else if array_includes(longSignals, "broad1")
+            //stopLossPriceLong := close * (1 - broad1StopLossMultLong)
+            stopLossPriceLong := resulting_close * (1 - stopLossMultLong)
+        else if array_includes(longSignals, "broad3")
+            //stopLossPriceLong := close * (1 - broad3StopLossMultLong)
+            stopLossPriceLong := resulting_close * (1 - stopLossMultLong)
+        //stopLossPriceLong := low[1] * stopLossMultSidewaysLong
+        else if (array_includes(longSignals, "tight"))
+        //stopLossPriceLong := low_of_last_candle
+            stopLossPriceLong := resulting_close * (1 - tightStopLossMultLong)
+            
+    if (tradeMethodShort == "nls2 long mirror") and (array_includes(shortSignals, "tight"))
+        stopLossPriceShort := resulting_close * (1 + tightStopLossMultShort)     
+        
+        
+    
+    //if shortEntry            
+    //if (tradeMethodShort == "nls2")
+    //    if array_includes(longSignals, "broad2")
+    //        stopLossPriceShort := close * stopLossMultShort
+    //    else if (array_includes(shortSignals, "broad1"))
+    //        stopLossPriceShort := close * stopLossMultShort
+    //    else if (array_includes(shortSignals, "tight"))
+    //        stopLossPriceShort := high[1]
+    //if (sidewaysShortMethod == "nls2")
+    //    if (array_includes(shortSignals, "broad1") or array_includes(longSignals, "broad2"))
+     //       stopLossPriceShort := close * stopLossMultSidewaysShort
+     //   if (array_includes(shortSignals, "tight"))
+     //       stopLossPriceShort := high[1]
+    
+    if shortMethod == "div rebound"
+    // WOHL HIER IST DER FEHLER MUSS MACHEN
+        //stopLossPriceShort := high[1] * 1.01
+    // 100 : x = close : close - priceDifference
+    // x = (close / close - priceDifference)
+        
+        //if (customTrailStartPercShort[1])
+        //    customTrailStartPercShort := customTrailStartPercShort[1]
+        customTrailPercShort := 0.88
+            
+    //if tradeMethodLong == "nls2"
+    
+    //if (tradeMethodLongTightOrBroad == "tight" and tradeMethodLong == "nls2")
+    //    resultingTakeProfitStartPercLong := tightTakeProfitStartPercLong
+    //    resultingTrailPercLong := tightTakeProfitPercLong
+            
+    //    if (tradeMethodLongTightOrBroad == "broad1")
+    //        resultingTakeProfitStartPercLong := broad1TakeProfitStartPercLong
+    //        resultingTrailPercLong := broad1TakeProfitPercLong
+            
+    //    if (tradeMethodLongTightOrBroad == "broad2")
+    //        resultingTakeProfitStartPercLong := broad2TakeProfitStartPercLong
+    //        resultingTrailPercLong := broad2TakeProfitPercLong
+            
+    //    if (tradeMethodLongTightOrBroad == "broad3")
+    //        resultingTakeProfitStartPercLong := broad3TakeProfitStartPercLong
+    //        resultingTrailPercLong := broad3TakeProfitPercLong
+            
+    //else
+    
+    resultingTakeProfitStartPercLong := takeProfitStartPercLong
+    resultingTrailPercLong := trailPercLong
+               
+    // Intercept entry signals if the actual trade is understroyable
+              
+//    if longEntry and undestroyableTradeLong[1]
+//        longEntry := false
+//        stopLossPriceLong := stopLossPriceLong[1]
+//        tradeType := na
+//        undestroyableTradeLong := false
+//        tradeEntryIsCustomLong := false
+//        tradeMethodLong := na
+        
+//    if shortEntry and undestroyableTradeShort[1]
+//        shortEntry := false
+//        stopLossPriceShort := stopLossPriceShort[1]
+//        tradeType := na
+//        undestroyableTradeShort := false
+//        tradeEntryIsCustomShort := false
+//        tradeMethodShort := na
+
+    // --------------------
+    // Execution of the trades
+    // -------------------- 
+    
+    // Long
+    // ----
+                
+    if (longEntry)
+
+        if (tradeMethodLong[1] != "none")
+        
+            // logic for what happens on repeated signals from already in action trades   
+            if (tradeMethodLong[1] == tradeMethodLong and tradeType[1] == tradeType)
+                
+                // repeated signal
+                if tradeType == "long"
+                    
+                    //if bevaviorAtRepetionLong == "Recalculate"
+                        //stopLossPriceLong := close * stopLossMultLong
+                        
+                    if bevaviorAtRepetionLong == "Recalculate Higher Only"
+                        //stopLossPriceLongNew = close * stopLossMultLong
+                        stopLossPriceLong := math.max(stopLossPriceLong[1], stopLossPriceLong)
+                        
+                    if bevaviorAtRepetionLong == "no action"
+                        // reset it to initial value
+                        stopLossPriceLong := initialStopLossPriceLong
+                        
+                else if tradeType == "sidewaysLong"
+                
+                    //if bevaviorAtRepetionSidewaysLong == "Recalculate"
+                    //    stopLossPriceLong := close * stopLossMultSidewaysLong
+                        
+                    if bevaviorAtRepetionSidewaysLong == "Recalculate Higher Only"
+                        //stopLossPriceLong := close * stopLossMultSidewaysLong
+                        stopLossPriceLong := math.max(stopLossPriceLong, stopLossPriceLong[1])
+                        
+                    if bevaviorAtRepetionSidewaysLong == "no action"
+                        // reset it to initial value
+                        stopLossPriceLong := initialStopLossPriceLong
+                        
+            else
+                
+                // TradeType nur neu schreiben wenn Trade auch wirklich ausgeführt wird, ansonsten reset zu werten davor
+                tradeType := tradeType[1]
+                stopLossPriceLong := initialStopLossPriceLong
+                tradeMethodLong := tradeMethodLong[1]
+                
+            //else
+            //    stopLossPriceLong := math.max(stopLossPriceLong, stopLossPriceLong[1])
+           
+        else
+        
+            resultingTradeMethod = ""
+            if (tradeMethodLong == "nls2")
+                if (array_includes(longSignals, "broad1"))
+                    resultingTradeMethod := "broad1"
+                    tradeMethodLongTightOrBroad := "broad1"
+                if (array_includes(longSignals, "broad2"))
+                    resultingTradeMethod := "broad2"
+                    tradeMethodLongTightOrBroad := "broad2"
+                if (array_includes(longSignals, "broad3"))
+                    resultingTradeMethod := "broad3"
+                    tradeMethodLongTightOrBroad := "broad3"
+                if (array_includes(longSignals, "tight"))
+                    resultingTradeMethod := "tight"
+                    tradeMethodLongTightOrBroad := "tight"
+            else
+                resultingTradeMethod := tradeMethodLong
+                    
+            // initial signal
+            if not entryPriceLong
+                entryPriceLong := resulting_close
+            strategy.entry("long",strategy.long, comment = resultingTradeMethod + " " + tradeType)
+            //stopLossPriceLong := close * stopLossMultLong
+            stopLossPriceLong := math.max(stopLossPriceLong, stopLossPriceLong[1])
+            executingTradeLong := true
+        
+    if (longClose)    
+        strategy.close("long", comment = longCloseReason + " " + tradeType + " close")
+        earningsAfterCloseTrade := resulting_close - entryPriceLong
+        executingClose := true
+        executingClose
+
+    // Long Stop Loss / Take Profit Procession
+    // ----
+    
+    if tradeType[1] == "sidewaysLong"
+        resultingTakeProfitStartPercLong := takeProfitStartPercSidewaysLong
+        resultingTrailPercLong := trailPercSidewaysLong
+            
+    if tradeType[1] == "long3"
+        resultingTakeProfitStartPercLong := 10000000000
+        resultingTrailPercLong := 10000000000
+            
+    // Determine trail stop loss prices
+    takeProfitPriceLong := if strategy.position_size > 0 and (resulting_close > entryPriceLong * (1 + resultingTakeProfitStartPercLong) or entryPriceReached)
+        entryPriceReached := true
+        math.max(resulting_close * (1 - resultingTrailPercLong), takeProfitPriceLong[1])
+    else
+        0
+
+    profit = 0.0
+    profitPerc = 0.0
+
+    if (entryPriceLong)
+        profit := close - entryPriceLong
+        profitPerc := 100 / (entryPriceLong / profit)
+
+    if (entryPriceShort)
+        profit := entryPriceShort - close
+        profitPerc := 100 / (entryPriceShort / profit)
+
+    
+
+    if strategy.position_size > 0 or strategy.position_size < 0
+
+        tradeBGColor:= color.new(color.blue, 70)
+
+    prot2Text = str.tostring(math.round(profitPerc,2)) + " %"
+
+
+    lastLiveProfitLabel= label.new(bar_index, high, text ="", style = label.style_none)
+    if strategy.position_size > 0 or strategy.position_size < 0
+        lastLiveProfitLabel := label.new(bar_index-3, high + (high * 0.03), text = prot2Text, textcolor = profitPerc >= 0 ? color.green : color.red, size = size.huge, style = label.style_none, text_font_family = font.family_monospace)
+        label.delete(lastLiveProfitLabel[1])
+    else
+        lastLiveProfitLabel := label.new(bar_index, high, text ="", style = label.style_none)        
+        label.delete(lastLiveProfitLabel[1])
+
+
+    if not strategy.position_size and not executingTradeLong
+        tradeMethodLong := "none"
+        tradeMethodLongTightOrBroad := "none"
+        takeProfitPriceLong := 0.0
+        profitLevelReachedLong := 0.0
+        stopLossPriceLong := 0.0
+        entryPriceLong := 0.0
+        entryPriceReached := false
+        tradeAgeLong := 0
+        resultingStopPriceLong := 0.0
+        undestroyableTradeLong := false
+        tradeEntryIsCustomLong := false
+
+        percByStrategy = math.round(strategy.closedtrades.profit_percent(strategy.closedtrades-1), 2)
+        protText = str.tostring(percByStrategy) + " %"
+
+        if strategy.position_size[1] > 0
+            label.new(bar_index, high + (high * 0.03), text = protText, textcolor = percByStrategy >= 0 ? color.green : color.red, size = size.huge, style = label.style_none, text_font_family = font.family_monospace)
+//
+        if strategy.position_size[1] < 0
+            label.new(bar_index, high + (high * 0.03), text = protText, textcolor = percByStrategy >= 0 ? color.green : color.red, size = size.huge, style = label.style_none, text_font_family = font.family_monospace)
+
+    
+    if strategy.position_size or longEntry
+        tradeAgeLong += 1
+        
+        if not longEntry and (tradeType == "long" or tradeType == "sidewaysLong")
+                    
+            if bevaviorAtRepetionLong == "Recalculate Higher Only"
+                stopLossPriceLong := math.max(stopLossPriceLong[1], stopLossPriceLong)
+                
+            else if bevaviorAtRepetionLong == "no action"
+                // reset it to initial value
+                stopLossPriceLong := initialStopLossPriceLong
+                    
+//        if longEntry != true and ((tradeType == "long" and (longMethod == "SAR" or longCloseMethod == "SAR")) or (tradeType == "sidewaysLong" and (sidewaysLongMethod == "SAR" or sidewaysLongCloseMethod == "SAR")))  
+//            stopLossPriceLong := SAR
+            
+        // Set long Take Profit and Stop Loss
+        if (useStopLossLong or useTakeProfitLong) and (stopLossPriceLong > 0 or takeProfitPriceLong > 0)
+            if takeProfitPriceLong > stopLossPriceLong
+                resultingStopPriceLong := takeProfitPriceLong
+            else
+                resultingStopPriceLong := stopLossPriceLong
+        
+        // if short entry is true exit long immediately
+        if (shortEntry or shortEntrySignalDespiteDeactivated) and useShortEntryAsCloseSignalLong
+            strategy.close('long', comment='short entry')
+
+        strategy.exit('tp/sl exit', 'long', stop=resultingStopPriceLong)
+
+    // Short
+    // -----
+
+    if shortEntry
+    
+        //if tradeType[1] == "sidewaysShort" and tradeType == "sidewaysShort" and tradeMethodShort[1] == tradeMethodShort
+        
+        //if tradeType[1] == "short" and tradeType == "short" and tradeMethodShort[1] == tradeMethodShort
+        
+        
+        if (tradeMethodShort[1] != "none")
+        
+            // logic for what happens on repeated signals from already in action trades  
+            if (tradeMethodShort[1] == tradeMethodShort and tradeType[1] == tradeType)
+        
+                // repeated signal
+                if tradeType == "short"
+                
+                    //if bevaviorAtRepetionShort == "Recalculate"
+                    //    stopLossPriceShort := close * stopLossMultShort
+                        
+                    if bevaviorAtRepetionShort == "Recalculate Higher Only"
+                        //stopLossPriceShort := close * stopLossMultShort
+                        stopLossPriceShort := math.min(stopLossPriceShort, stopLossPriceShort[1])
+                        
+                    if bevaviorAtRepetionShort == "no action"
+                        // reset it to last value
+                        stopLossPriceShort := initialStopLossPriceShort
+                        
+                else if tradeType == "sidewaysShort"
+                
+                    //if bevaviorAtRepetionSidewaysShort == "Recalculate"
+                    //    stopLossPriceShort := close * stopLossMultSidewaysShort
+                        
+                    if bevaviorAtRepetionSidewaysShort == "Recalculate Higher Only"
+                        //stopLossPriceShort := close * stopLossMultSidewaysShort
+                        stopLossPriceShort := math.min(stopLossPriceShort, stopLossPriceShort[1])
+                        
+                    if bevaviorAtRepetionSidewaysShort == "no action"
+                        // reset it to last value
+                        stopLossPriceShort := initialStopLossPriceShort
+                //else
+                //    stopLossPriceLong := math.max(stopLossPriceLong, stopLossPriceLong[1])
+            else
+                
+                // TradeType nur neu schreiben wenn Trade auch wirklich ausgeführt wird, ansonsten reset zu werten davor
+                tradeType := tradeType[1]
+                stopLossPriceShort := initialStopLossPriceShort
+                tradeMethodShort := tradeMethodShort[1]
+            
+        else
+        
+            
+            // Erstes Vorkommen von involvierter Divergenz
+            if (shortMethod == "div rebound")
+                tradeSellDivsLowestPriceShort := array.get(divArrShort, lastSellDivergenceTargetPriceArrayIndex)
+                stopLossPriceShort := resulting_high[1] * stopLossMultShort
+                //customTrailStartPercShort := 100 / (close / (close - lastSellDivergenceTargetPrice))
+                
+            //customStopLossPriceShort := open[1]
+            
+            resultingTradeMethodShort = ""
+            if (tradeMethodShort == "nls2 long mirror")
+                if (array_includes(shortSignals, "broad1"))
+                    resultingTradeMethodShort := "broad1"
+                if (array_includes(shortSignals, "tight"))
+                    resultingTradeMethodShort := "tight"
+            else
+                resultingTradeMethodShort := tradeMethodShort
+    
+            // initial signal
+            strategy.entry('short', strategy.short, comment = resultingTradeMethodShort + " " + tradeType)
+            if not entryPriceShort
+                entryPriceShort := resulting_close
+                entryPriceShort
+            short_window := false
+            //stopLossPriceShort := hh20
+            //stopLossPriceShort := close * stopLossMultShort
+            //if stopLossPriceShort[1] > 0
+            //    stopLossPriceShort := math.min(stopLossPriceShort, stopLossPriceShort[1])
+            //    stopLossPriceShort
+            executingTradeShort := true
+            executingTradeShort
+
+    if shortClose
+        strategy.close('short', comment= shortCloseReason + " " + tradeType + " close")
+        executingClose := true
+        earningsAfterCloseTrade := entryPriceShort - resulting_close
+        earningsAfterCloseTrade
+
+    //if (close < (entryPriceShort * 0.9))
+    //    stopLossPriceShort := hh10
+
+    //if (close < (entryPriceShort * 0.85))
+    //    stopLossPriceShort := hh5
+
+    
+
+    // Short Stop Loss / Take Profit Procession
+    // ----
+    
+    resultingTrailStartPercShort = float(na)
+    resultingTrailPercShort = float(na)
+    
+    resultingTrailStartPercShort := trailStartPercShort
+    resultingTrailPercShort := trailPercShort
+    
+    if tradeType == "sidewaysShort"
+        resultingTrailStartPercShort := trailStartPercSidewaysShort
+        resultingTrailPercShort := trailPercSidewaysShort
+            
+    if (customTrailStartPercShort)
+        resultingTrailStartPercShort := customTrailStartPercShort
+        resultingTrailPercShort := customTrailPercShort
+    
+    // Determine trail stop loss prices
+    stopValue = 0.0
+    takeProfitPriceShort := if strategy.position_size < 0 and (resulting_close < entryPriceShort * ((100 - resultingTrailStartPercShort) / 100) or takeProfitPriceShort)
+        stopValue := resulting_close * ((100 + resultingTrailPercShort) / 100)
+        if takeProfitPriceShort[1] > 0
+            math.min(stopValue, takeProfitPriceShort[1])
+        else
+            stopValue
+    else
+        0.0
+
+    if strategy.position_size >= 0.00 and not executingTradeShort
+        takeProfitPriceShort := 0.0
+        tradeMethodShort := "none"
+        profitLevelReachedShort := 0.0
+        stopLossPriceShort := 0.0
+        entryPriceShort := 0.0
+        tradeAgeShort := 0
+        undestroyableTradeShort := false
+        tradeEntryIsCustomShort := false
+        tradeSellDivsLowestPriceShort := na
+        resultingLimitPrice := na
+        tradePutToSARShort := false
+        tradeAgeShort
+
+    if strategy.position_size < 0 or shortEntry
+        tradeAgeShort += 1
+        
+        // if short entry is true exit long immediately
+        if useLongEntryAsCloseSignalShort == true and (longEntry or array_includes(longSignals, longMethod))
+            strategy.close('short', comment='long entry')
+        
+        if not shortEntry and (tradeType == "short" or tradeType == "sidewaysShort")
+                    
+            if bevaviorAtRepetionLong == "Recalculate Higher Only"
+                stopLossPriceShort := math.min(stopLossPriceShort[1], stopLossPriceShort)
+                
+            else if bevaviorAtRepetionLong == "no action"
+                // reset it to initial value
+                stopLossPriceShort := initialStopLossPriceShort
+        
+        // limit (series int/float) Optionaler Parameter. Profit Target (erfordert einen bestimmten Preis). Wenn es angegeben ist, wird eine Limit Order platziert, um aus der Position zum angegebenen
+        // ist ein (oder besserem) Kurs auszusteigen. Priorität des Parameters 'limit' ist höher als die Priorität des Parameters 'profit' ('limit' wird anstelle von 'profit' benutzt, wenn der Wert 
+        // nicht 'NaN' ist). Der Standardwert ist "NaN".
+        
+        if (tradeMethodShort == "div rebound")
+            // nimm nur 90% der Differenz zum letzten Div Tiefpunkt
+            //if (sellDivergenceConfirmed == false)
+            resultingLimitPrice := resulting_close - ((resulting_close - tradeSellDivsLowestPriceShort) * 0.8)
+        
+        resultingStopPriceShort := stopLossPriceShort
+
+        // Set long Take Profit and Stop Loss
+        if (useStopLossShort or useTakeProfitShort) and (stopLossPriceShort > 0 or takeProfitPriceShort > 0)
+            if takeProfitPriceShort > stopLossPriceShort
+                resultingStopPriceShort := takeProfitPriceShort
+            else
+                resultingStopPriceShort := stopLossPriceShort
+        else
+            resultingStopPriceShort := na
+        
+//        if shortEntry != true and (tradePutToSARShort or (tradeType == "short" and (shortMethod == "SAR" or shortCloseMethod == "SAR")) or (tradeType == "sidewaysShort" and (sidewaysShortMethod == "SAR" or sidewaysShortCloseMethod == "SAR")))  
+//            if (SAR < resulting_close and tradeAgeShort == 1)
+//                isSARPeriodToOmission := true
+                
+//            if (SAR > resulting_close)
+//                isSARPeriodToOmission := false
+            
+//            if not isSARPeriodToOmission
+//                resultingStopPriceShort := SAR
+                
+            
+        //if tradeMethodShort == "div confirmed"
+        //    resultingStopPriceShort := array.get(divArrShort, sellDivergenceClosePriceArrayIndex) * 0.99
+
+        strategy.exit('tp/sl short', 'short', stop=resultingStopPriceShort, limit=resultingLimitPrice)
+        
+    // --------------------
+    // After Processing For Next Candle aso
+    // -------------------- 
+    
+    if tradeMethodLong == "none" and tradeMethodShort == "none"
+        tradeType := na
+
+// --------------------
+// Plots
+// -------------------- 
+
+bgcolor(tradeBGColor)
+
+//plot(divergenceCloseLong ? 1 : 0, title = "divergenceCloseLong")
+
+//plot(array.get(divArrShort, lastSellDivergenceTargetPriceArrayIndex), 'arr lastSellDivergenceTargetPrice')
+
+//plot(returnOccuranceOfCondition("float", DIP240, "<", DIN240, 12), title="returnOccuranceOfCondition(float, DIP240, <, DIN240, 12)")
+//plot(distanceToLastSmmaTrendEndSignal,title="distanceToLastSmmaTrendEndSignal")
+//
+//plot(returnOccuranceOfConditionString("string", "slowSmmaTrend", "==", "down", 2), title="returnOccuranceOfConditionString(string, slowSmmaTrend, ==, down, 2) ")
+
+//plot(tradePutToSARShort ? 1 : 0, title="tradePutToSARShort")
+
+//plot(hh4w, color=color.orange)
+//plot(ll4w)
+//plot(longEntry ? 1 : 0,title="longEntry")
+
+//plot(ADX,title="ADX")
+//plot(DIPlus,title="DIPlus", color=color.green)
+//plot(DIMinus,title="DIMinus", color=color.red)
+
+//plot(returnOccuranceOfCondition("float", DIPlus, ">", DIMinus, 24),title="returnOccuranceOfCondition(float, DIPlus, >, DIMinus, 24)")
+
+//plot(close, title="close")
+//plot(bollinger_basis, title="bollinger_basis")
+//plot(returnOccuranceOfCondition("float", close, ">", bollinger_basis, 30),title="returnOccuranceOfCondition(float, close, >, bollinger_basis, 30)")
+
+
+//plot(lastSellDivergenceAge,title="lastSellDivergenceAge")
+//plot(lastSellDivergenceAge ? returnOccuranceOfConditionString("string", smmaTrend, "==", "up", lastSellDivergenceAge) : 0,title="returnOccuranceOfConditionString(string, smmaTrend, ==, up, lastSellDivergenceAge)")
+
+//plot(shortEntry ? 1 : 0,title="shortEntry")
+
+
+//plot(tradeSellDivsLowestPriceShort,title="tradeSellDivsLowestPriceShort", display=display.none)
+//plot(customTrailStartPercShort,title="tradeSellDivsLowestPriceShort", display=display.none)
+
+//plot(lastBuyDivergenceTargetPrice,title="lastBuyDivergenceTargetPrice", display=display.none)
+//plot(lastSellDivergenceTargetPrice,title="lastSellDivergenceTargetPrice", display=display.none)
+
+//plot(divergenceNumber, title="divergenceNumber")
+
+//plot(sellDivergenceIntact ? 1 : 0, title="sellDivergenceIntact")
+//plot(sellDivergenceOvercome ? 1 : 0, title="sellDivergenceOvercome")
+//plot(sellDivergenceCompleted ? 1 : 0, title="sellDivergenceCompleted")
+
+plot(not showOnlyDemoItems ? higherSqueezeZone : na, title="higher squeeze zone", color=color.yellow)
+plot(not showOnlyDemoItems ? lowerSqueezeZone : na, title="lower squeeze zone", color=color.yellow)
+
+//plot(lowBBWPhase ? 1 : 0,title="lowBBWPhase")
+//plot(distanceToStartOfLowBBPhase,title="distanceToStartOfLowBBPhase")
+//plot(distanceToStartOfSqueeze,title="distanceToStartOfSqueeze")
+//
+//plot(squeezeStartInsideLowBBWPhase ? 1 : 0,title="squeezeStartInsideLowBBWPhase")
+
+
+//plot(tradeSellDivsLowestPriceShort, title="tradeSellDivsLowestPriceShort")
+//plot(returnOccuranceOfCondition("float", DIPlus, "<", DIMinus, 20), title="returnOccuranceOfCondition(float, DIPlus, <, DIMinus, 20)")
+
+//plot(returnOccuranceOfCondition("float", DIP480, "<", DIN480, 12), title="returnOccurn(float, DIP480, <, DIN480, 12)")
+//plot(returnOccuranceOfConditionString("string", vwmaTrend, "==", "up", 10), title="returnOccura(string, vwmaTrend, ==, up, 10)")
+
+
+//plot(tradeMethodLong[1] == tradeMethodLong ? 1 : 0, title="repeated Signal")
+//if (tradeMethodLong != tradeMethodLong[1])
+//    la = label.new(bar_index, low, text=str.tostring(tradeMethodLong))
+//l = label.new(bar_index, high, "pos_reg" + str.tostring(output))
+
+//plot(longEntry and tradeMethodLong[1] != "none" and tradeMethodLong[1] == tradeMethodLong and tradeType[1] == tradeType ? 1 : 0, title="repeated Signal")
+//plot(longEntry ? 1 : 0, title="longEntry")
+
+//if (longEntry)
+
+//        if (tradeMethodLong[1] != "none")
+        
+            // logic for what happens on repeated signals from already in action trades   
+//            if (tradeMethodLong[1] == tradeMethodLong and tradeType[1] == tradeType)
+                
+                // repeated signal
+//                if tradeType == "long"
+
+//tradeTypeId = 0
+//if tradeType == "long"
+//    tradeTypeId := 1
+//else if tradeType == "short"
+//    tradeTypeId := 2
+//else if tradeType == "sidewaysLong"
+//    tradeTypeId := 3
+//else if tradeType == "sidewaysShort"
+//    tradeTypeId := 4
+
+
+
+//plot(tradeTypeId, title="tradeTypeId")
+//plot(tradeMethodLong == "nls2" ? 1 : 0, title="tradeMethodLong is nls2")
+
+
+
+//plot(returnOccuranceOfCondition("float", DIMinus, "<", DIPlus, 30), title="returnOccuranceOfCondition(float, DIMinus, >, DIPlus, 30)")
+
+//plot(resultingStopPriceLong, title="resultingStopPriceLong", color=color.orange)
+
+//plot(resultingTakeProfitStartPercLong, title="resultingTakeProfitStartPercLong", color=color.orange)
+//plot(resultingTrailPercLong, title="resultingTrailPercLong", color=color.orange)
+
+//plot(resultingTakeProfitStartPercLong, title="resultingTakeProfitStartPercLong", color=color.orange)
+//plot(resultingTrailPercLong, title="resultingTrailPercLong", color=color.orange)
+
+//plot(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "intact"  ? 1 : 0, title="sellDivergenceIntact")
+////plot(array.get(divArrShortEntry, sellDivergenceIntactRemovalArrayIndex), title="sellDivergenceIntactRemoval")
+//plot(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "confirmed"  ? 1 : 0, title="sellDivergenceConfirmed")
+//plot(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "completed" ? 1 : 0, title="sellDivergenceCompleted")
+////plot(array.get(divArrShortExit, sellDivergenceAgeArrayIndex), title="sellDivergenceAgeShort")
+////plot((array.get(divArrShortExit, sellDivergenceClosePriceArrayIndex) * 1.03), title="sellDivergenceClosePrice * 1.03")
+//
+//
+//plot(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "intact" ? 1 : 0, title="buyDivergenceIntact")
+////plot(array.get(divArrShortEntry, buyDivergenceIntactRemovalArrayIndex), title="buyDivergenceIntactRemoval")
+//plot(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "confirmed" ? 1 : 0, title="buyDivergenceConfirmed")
+//plot(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "completed" ? 1 : 0, title="buyDivergenceCompleted")
+//plot(array.get(divArrShortExit, buyDivergenceAgeArrayIndex), title="buyDivergenceAge")
+//plot((array.get(divArrShortExit, buyDivergenceClosePriceArrayIndex) * 0.97), title="buyDivergenceClosePrice * 0.97")
+
+//plot(short_window ? 1 : 0, title="short_window")
+
+//plot(occuranceSellDivergence10MultLong,title="occuranceSellDivergence10Mult", color=color.white)
+//plot(occuranceSellDivergence3MultLong,title="occuranceSellDivergence3Mult", color=color.white)
+//plot(occuranceSellDivergenceLong,title="occuranceSellDivergence", color=color.white)
+//plot(occuranceBuyDivergence10MultLong,title="occuranceBuyDivergence10Mult", color=color.white)
+//plot(occuranceBuyDivergence3MultLong,title="occuranceBuyDivergence3Mult", color=color.white)
+//plot(occuranceBuyDivergenceLong,title="occuranceBuyDivergence", color=color.white)
+
+//plot(ADX, title="ADX") 
+
+//plot(smaDmacFast, title="smaDmacFast", color=color.black)
+//plot(smaDmacMid, title="smaDmacMid")
+
+//plot(trailStartPercShort,title="trailStartPercShort")
+
+//plot(resultingStopPriceShort, title='resultingStopPriceShort', color=color.new(color.red, 0))
+//plot(resultingStopPriceLong, title='resultingStopPriceLong', color=color.new(color.red, 0))
+
+
+//if (close > bollinger_top and VLI_top) // 1 
+//        if (close > sma_fast) // 2
+//            if (bbw < VLI_top) // 3
+//                if (low_volatility_level) // 4
+//                    if (sma_mid > sma_veryslow) // 5
+//                        //broad2
+//                else 
+//                    // broad 1
+//            else if (sma_slow > sma_veryslow) // 6
+//                // tight
+
+//plot((close > bollinger_top and VLI_top) ? 1 : 0, title='(close > bollinger_top and VLI_top)', color=color.new(color.purple, 0), display=display.none)
+//plot((close > sma_fast) ? 1 : 0, title='(close > sma_fast)', color=color.new(color.purple, 0), display=display.none)
+//plot((bbw < VLI_top) ? 1 : 0, title='(bbw < VLI_top)', color=color.new(color.purple, 0), display=display.none)
+//plot((low_volatility_level) ? 1 : 0, title='(low_volatility_level)', color=color.new(color.purple, 0), display=display.none)
+//plot((sma_mid > sma_veryslow) ? 1 : 0, title='(sma_mid > sma_veryslow)', color=color.new(color.purple, 0), display=display.none)
+//plot((sma_slow > sma_veryslow) ? 1 : 0, title='(sma_slow > sma_veryslow)', color=color.new(color.purple, 0), display=display.none)
+
+//plot(takeProfitStartPercLong,title="takeProfitStartPercLong")
+
+
+        
+//plotshape(array_includes(longSignals, "Murphy"), style=shape.flag, text="M", color=color.new(color.green, 0), location=location.belowbar)
+plotshape(not showOnlyDemoItems and array_includes(longSignals, "nls2") and array_includes(longSignals, "broad1"), style=shape.circle, text="b1", color=color.new(color.blue, 0), location=location.belowbar)
+plotshape(not showOnlyDemoItems and array_includes(longSignals, "nls2") and array_includes(longSignals, "broad2"), style=shape.circle, text="b2", color=color.new(color.blue, 0), location=location.belowbar)
+plotshape(not showOnlyDemoItems and array_includes(longSignals, "nls2") and array_includes(longSignals, "tight"), style=shape.circle, text="ti", color=color.new(color.blue, 0), location=location.belowbar)
+//plotshape(array_includes(longSignals, "ultra-divs"), style=shape.square, text="Q", color=color.new(color.black, 0), location=location.belowbar)
+//plotshape(array_includes(longSignals, "ultra-ma"), style=shape.xcross, text="V", color=color.new(color.black, 0), location=location.belowbar)
+//plotshape(adx_trend == "kaufen" and array_includes(longSignals, "SAR"), style=shape.xcross, text="s", color=color.new(color.black, 0), location=location.belowbar)
+//plotshape(adx_trend == "kaufen" and array_includes(longSignals, "BB gimmee bar"), style=shape.cross, text="", color=color.new(color.green, 0), location=location.belowbar)
+//plotshape(array_includes(longSignals, "BB mean reversion"), style=shape.triangledown, text="m", color=color.new(color.red, 0), location=location.belowbar)
+//plotshape(array_includes(longSignals, "RSI"), style=shape.triangleup, text="R", color=color.new(color.orange, 0), location=location.belowbar)
+plotshape(not showOnlyDemoItems and ll4w_trendchange and array_includes(longSignals, "4-Wochen-Regel"), style=shape.triangleup, text="W", color=color.new(color.orange, 0), location=location.belowbar)
+//plotshape(array_includes(longSignals, "buy-div-reneval"), style=shape.triangleup, text="S", color=color.new(color.black, 0), location=location.belowbar)
+//plotchar(data, char='❄', text=)
+//2plotshape("sell", text='L', style=shape.labelup, color=color.new(color.white, 100), textcolor=color.new(color.lime, 0), location=location.belowbar, offset=-prd)
+//plotshape(array_includes(longSignals, "trend-div-breakout"), style=shape.flag, text="TB", color=color.new(color.blue, 0), location=location.belowbar)
+
+
+//plotshape(array_includes(longCloseSignals, "Murphy"), style=shape.flag, text="M", color=color.new(color.green, 0), location=location.abovebar)
+//plotshape(array_includes(longCloseSignals, "nls2"), style=shape.circle, text="nc", color=color.new(color.red, 0), location=location.abovebar)
+//plotshape(array_includes(longCloseSignals, "SAR"), style=shape.xcross, text="s", color=color.new(color.black, 0), location=location.abovebar)
+//plotshape(array_includes(longCloseSignals, "BB gimmee bar"), style=shape.cross, text="", color=color.new(color.green, 0), location=location.abovebar)
+//plotshape(array_includes(longCloseSignals, "BB mean reversion"), style=shape.triangledown, text="m", color=color.new(color.red, 0), location=location.abovebar)
+//plotshape(array_includes(longCloseSignals, "RSI"), style=shape.triangleup, text="R", color=color.new(color.orange, 0), location=location.abovebar)
+//plotshape(array_includes(longCloseSignals, "StochRSI"), style=shape.circle, text="SR", color=color.new(color.orange, 0), location=location.abovebar)
+plotshape(not showOnlyDemoItems and array_includes(longCloseSignals, "adx-di-cross"), style=shape.circle, text="na", color=color.new(color.green, 0), location=location.abovebar)
+plotshape(not showOnlyDemoItems and array_includes(longCloseSignals, "breakout"), style=shape.square, text="br", color=color.new(color.black, 0), location=location.abovebar)
+plotshape(not showOnlyDemoItems and array_includes(longCloseSignals, "div confirmed"), style=shape.square, text="Q", color=color.new(color.blue, 0), location=location.abovebar)
+plotshape(not showOnlyDemoItems and array_includes(longCloseSignals, "smma trend end"), style=shape.flag, text="S", color=color.new(color.green, 0), location=location.abovebar)
+
+//plotshape(not showOnlyDemoItems and adx_trend == "seitwaerts" and array_includes(shortSignals, "div rebound"), style=shape.circle, text="d", color=color.new(color.red, 0), location=location.abovebar) 
+//plotshape(adx_trend == "seitwaerts" and array_includes(shortSignals, "Murphy"), style=shape.flag, text="", color=color.new(color.green, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "nls2") and array_includes(shortSignals, "broad1"), style=shape.circle, text="b1", color=color.new(color.blue, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "nls2") and array_includes(shortSignals, "broad2"), style=shape.circle, text="b2", color=color.new(color.blue, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "nls2") and array_includes(shortSignals, "tight"), style=shape.circle, text="ti", color=color.new(color.blue, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "ultra-divs"), style=shape.square, text="Q", color=color.new(color.black, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "ultra-ma"), style=shape.xcross, text="V", color=color.new(color.black, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "short 4"), style=shape.arrowup, text="", color=color.new(color.black, 0), location=location.abovebar)
+//plotshape(adx_trend == "seitwaerts" and array_includes(shortSignals, "SAR"), style=shape.circle, text="", color=color.new(color.orange, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "ausbruch"), style=shape.square, text="a", color=color.new(color.orange, 0), location=location.abovebar)
+//plotshape(adx_trend == "seitwaerts" and array_includes(shortSignals, "recht gut"), style=shape.arrowdown, text="", color=color.new(color.green, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "BB mean reversion"), style=shape.triangledown, text="", color=color.new(color.red, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "RSI"), style=shape.triangleup, text="R", color=color.new(color.orange, 0), location=location.abovebar)
+plotshape(not showOnlyDemoItems and ll4w_trendchange and array_includes(shortSignals, "4-Wochen-Regel"), style=shape.triangleup, text="W", color=color.new(color.orange, 0), location=location.abovebar)
+//plotshape(array_includes(shortSignals, "sell-div-reneval"), style=shape.triangleup, text="S", color=color.new(color.black, 0), location=location.abovebar)
+plotshape(not showOnlyDemoItems and array_includes(shortSignals,  "div confirmed"), style=shape.xcross, text="Q", color=color.new(color.blue, 0), location=location.abovebar)
+plotshape(not showOnlyDemoItems and array_includes(shortSignals,  "B-Methode 1"), style=shape.circle, text="B1", color=color.new(color.red, 0), location=location.abovebar)
+
+
+//plotshape(adx_trend == "seitwaerts" and array_includes(shortCloseSignals, "Murphy"), style=shape.flag, text="", color=color.new(color.green, 0), location=location.belowbar)
+//plotshape(array_includes(shortCloseSignals, "nls2"), style=shape.circle, text="nc", color=color.new(color.red, 0), location=location.belowbar)
+//plotshape(array_includes(shortCloseSignals, "short 4"), style=shape.arrowup, text="", color=color.new(color.black, 0), location=location.belowbar)
+//plotshape(adx_trend == "seitwaerts" and array_includes(shortCloseSignals, "SAR"), style=shape.circle, text="", color=color.new(color.orange, 0), location=location.belowbar)
+//plotshape(array_includes(shortCloseSignals, "ausbruch"), style=shape.square, text="a", color=color.new(color.orange, 0), location=location.belowbar)
+//plotshape(adx_trend == "seitwaerts" and array_includes(shortCloseSignals, "recht gut"), style=shape.arrowdown, text="", color=color.new(color.green, 0), location=location.belowbar)
+//plotshape(array_includes(shortCloseSignals, "BB mean reversion"), style=shape.triangledown, text="", color=color.new(color.red, 0), location=location.belowbar)
+//plotshape(array_includes(shortCloseSignals, "RSI"), style=shape.triangleup, text="R", color=color.new(color.orange, 0), location=location.belowbar)
+//plotshape(array_includes(shortCloseSignals, "div confirmed"), style=shape.xcross, text="Q", color=color.new(color.blue, 0), location=location.belowbar)
+plotshape(not showOnlyDemoItems and array_includes(shortCloseSignals, "adx-di-cross"), style=shape.circle, text="na", color=color.new(color.green, 0), location=location.belowbar)
+plotshape(not showOnlyDemoItems and array_includes(shortCloseSignals, "breakout"), style=shape.square, text="br", color=color.new(color.black, 0), location=location.belowbar)
+plotshape(not showOnlyDemoItems and array_includes(shortCloseSignals, "smma trend end"), style=shape.flag, text="S", color=color.new(color.green, 0), location=location.belowbar)
+//plotshape(array_includes(shortCloseSignals,  "B-Methode 1"), style=shape.circle, text="B1", color=color.new(color.red, 0), location=location.belowbar)
+//plot(vol_condition ? 1 : 0, title='vol_condition')
+
+//plot(low_volatility_level ? 1 : 0, title='low_volatility_level')
+//plot(high_volatility_level ? 1 : 0, title='high_volatility_level')
+//plot(extreme_volatility ? 1 : 0, title="extreme_volatility")
+
+//bgcolor(useAdx ? color.new(adx_color,90) : color.new(color.white,90)) 
+
+//bgcolor(useAdx == false and ta.crossover(close, bollinger_top) and vol_condition and VLI_top and (smmaTrend == "up" or not useSMMATrendLong)  ? color.new(color.yellow,90) : useAdx ? color.new(color.white,100) : color.new(color.black,90))   
+//bgcolor(useAdx == false and vol_condition ? color.new(color.white,90) : useAdx ? color.new(color.white,100) : color.new(color.red,90))  
+//bgcolor(useAdx == false and useSMMATrendLong and smmaTrend == "down" ? color.new(color.red,90) : color.new(color.white,90))
+//bgcolor(useAdx == false and strategy.position_size ? color.new(color.yellow,90) : useAdx ? color.new(color.white,100) : color.new(color.black,90))
+
+//bgcolor(sellDivergenceIntactLong ? color.new(color.purple,90) : color.new(color.white,100))
+//bgcolor(sellDivergenceConfirmedLong ? color.new(color.purple,90) : color.new(color.white,100))
+//bgcolor(sellDivergenceCompletedLong ? color.new(color.purple,95) : color.new(color.white,100))
+
+//bgcolor(buyDivergenceIntactLong ? color.new(color.yellow,90) : color.new(color.white,100))
+//bgcolor(buyDivergenceConfirmedLong ? color.new(color.yellow,90) : color.new(color.white,100))
+//bgcolor(buyDivergenceCompletedLong ? color.new(color.yellow,95) : color.new(color.white,100))
+
+//plot(bullishDivergenceDetectedShort ? 1 : 0, title="bullishDivergenceDetectedShort")
+//plot(bearishDivergenceDetectedShort ? 1 : 0, title="bearishDivergenceDetectedShort")
+
+//plot(sellDivergenceStatusShort != "" ? 1 : 0, title="sellDivergenceStatusShort")
+
+bgcolor(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "intact" ? color.new(color.purple,90) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "confirmed" ? color.new(color.purple,90) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "confirmed" ? color.new(color.purple,90) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "completed" ? color.new(color.purple,95) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "completed" ? color.new(color.purple,90) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, sellDivergenceStatusArrayIndex) == "completed" ? color.new(color.purple,90) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "intact" ? color.new(color.yellow,90) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "confirmed" ? color.new(color.yellow,90) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "confirmed" ? color.new(color.yellow,90) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "completed" ? color.new(color.yellow,95) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "completed" ? color.new(color.yellow,95) : color.new(color.white,100))
+bgcolor(array.get(divStringArrShortExit, buyDivergenceStatusArrayIndex) == "completed" ? color.new(color.yellow,95) : color.new(color.white,100))
+
+//bgcolor(sellDivergenceIntactLong ? color.new(color.purple,90) : color.new(color.white,100))
+//bgcolor(sellDivergenceConfirmedLong ? color.new(color.purple,90) : color.new(color.white,100))
+//bgcolor(sellDivergenceCompletedLong ? color.new(color.purple,95) : color.new(color.white,100))
+
+//bgcolor(buyDivergenceIntactLong ? color.new(color.yellow,90) : color.new(color.white,100))
+//bgcolor(buyDivergenceConfirmedLong ? color.new(color.yellow,90) : color.new(color.white,100))
+//bgcolor(buyDivergenceCompletedLong ? color.new(color.yellow,95) : color.new(color.white,100))
+
+//bgcolor(useAdx and adx_trend == "kaufen" ? color.new(color.green,90) : color.new(color.white,100))
+//bgcolor(useAdx and adx_trend == "verkaufen" ? color.new(color.red,90) : color.new(color.white,100))
+
+//bgcolor(lowBBWPhase ? color.new(color.green,90) : color.new(color.white,100))
+//bgcolor(squeeze_started ? color.new(color.black,80) : color.new(color.white,100))
+
+//bgcolor(trendChangePhase ? color.new(color.red,80) : color.new(color.white,100))
+
+
+//bgcolor(multi_adx_sideways ? color.new(color.black,70) : color.new(color.white,100))
+
+
+//bgcolor(adx_trend == "seitwaerts" ? color.new(color.yellow,90) : color.new(color.white,100))
+
+// farbe des abschliessenden balkens
+stopLossColorLong = color.white
+
+//if stopLossPriceLong < entryPriceLong
+//    stopLossColorLong := color.red
+//    stopLossColorLong
+//else
+//    stopLossColorLong := color.green
+//    stopLossColorLong
+
+// damit bei wechsel zu null den abschliessenden strich gibt der anzeigt ob der trade erfolgreich war
+//if stopLossPriceLong > entryPriceLong or takeProfitPriceLong > entryPriceLong or close > entryPriceLong
+//    stopLossColorLong := color.green
+//    stopLossColorLong
+//else
+//    stopLossColorLong := color.red
+//    stopLossColorLong
+
+//if stopLossPriceLong == 0.0
+//    if stopLossColorLong[1] == color.green or executingClose[1] and earningsAfterCloseTrade > 0
+//        stopLossColorLong := color.green
+//        stopLossColorLong
+//    else if stopLossColorLong[1] == color.red or executingClose[1] and earningsAfterCloseTrade < 0
+//        stopLossColorLong := color.red
+//        stopLossColorLong
+//    else if stopLossColorLong[1] == color.white
+//        stopLossColorLong := color.white
+//        stopLossColorLong
+
+//stopLossColorShort = color.white
+//if stopLossPriceShort > 0
+//    if stopLossPriceShort > entryPriceShort
+//        stopLossColorShort := color.red
+//        stopLossColorShort
+//    else
+//        stopLossColorShort := color.green
+//        stopLossColorShort
+
+// damit bei wechsel zu null den abschliessenden strich gibt der anzeigt ob der trade erfolgreich war
+//if stopLossPriceShort > 0 and takeProfitPriceShort > 0
+//    if stopLossPriceShort < entryPriceShort or takeProfitPriceShort < entryPriceShort or close < entryPriceShort
+//        stopLossColorShort := color.green
+//        stopLossColorShort
+//    else
+//        stopLossColorShort := color.red
+//        stopLossColorShort
+
+//if stopLossPriceShort == 0.0
+//    if stopLossColorShort[1] == color.green or executingClose[1] and earningsAfterCloseTrade > 0
+//        stopLossColorShort := color.green
+//        stopLossColorShort
+//    else if stopLossColorShort[1] == color.red or executingClose[1] and earningsAfterCloseTrade < 0
+//        stopLossColorShort := color.red
+//        stopLossColorShort
+//    else if stopLossColorShort[1] == color.white
+//        stopLossColorShort := color.white
+//        stopLossColorShort
+        
+//plot(entryPriceLong, title='entryPriceLong', color=color.new(color.orange, 0))
+////plot(stopLossPriceLong, title='stopLossPriceLong', color=stopLossColorLong)
+//plot(stopLossPriceLong, title='stopLossPriceLong', color=color.black)
+////plot(takeProfitPriceLong, title='takeProfitPriceLong', color=color.new(color.yellow, 0))
+////plot(resultingStopPriceLong, title='resultingStopPriceLong', color=color.new(color.yellow, 0))
+//
+//plot(entryPriceShort, title='entryPriceShort', color=color.new(color.orange, 0))
+////plot(stopLossPriceShort, title='stopLossPriceShort', color=stopLossColorShort)
+//plot(stopLossPriceShort, title='stopLossPriceShort', color=color.black)
+////plot(takeProfitPriceShort, title='takeProfitPriceShort', color=color.new(color.yellow, 0))
+////plot(resultingStopPriceShort, title='resultingStopPriceShort', color=color.new(color.yellow, 0))
+//
+//plot(sellDivergenceIntactShortEntry ? 1 : 0, title="sellDivergenceIntact")
+//plot(buyDivergenceIntactShortEntry ? 1 : 0, title="buyDivergenceIntact")
+//
+//plot(returnOccuranceOfConditionBool("bool", sellDivergenceIntactLongEntry, "==", 1, periodForDivergenceCheckLong), title="retOccur sellDivergenceIntactLongEntry")
+
+
+//l = label.new(bar_index, na, text=string(str.tostring(longSignals)), color=color.red, style=label.style_label_down, yloc=yloc.abovebar)
+
+//label.delete(l[1])
+
+// end farbe des abschliessenden balkens
+
+//plot(VLI_fast_length, title='VLI_fast_length')
+//plot(VLI_slow_length, title='VLI_slow_length')
+//plot(VLI_top_length, title='VLI_top_length')
+
+if length_mult > 1
+    low_of_last_candle := 0.0
+    for i = 0 to length_mult - 1 by 1
+        if low[i] < low_of_last_candle or low_of_last_candle == 0.0
+            low_of_last_candle := low[i]
+            low_of_last_candle
+else
+    low_of_last_candle := low
+    low_of_last_candle
+
+    
+    
+if (array.get(divArrShortEntry, lastSellDivergenceAgeArrayIndex) > 0)
+    //lastSellDivergenceAgeShort := array.get(divArrShort, lastSellDivergenceAgeArrayIndex) + 1
+    array.set(divArrShortEntry, lastSellDivergenceAgeArrayIndex, array.get(divArrShortEntry, lastSellDivergenceAgeArrayIndex) + 1)  
+else if (array.get(divArrShortEntry, lastBuyDivergenceAgeArrayIndex) > 0)
+    //lastSellDivergenceAgeShort := array.get(divArrShort, lastSellDivergenceAgeArrayIndex) + 1
+    array.set(divArrShortEntry, lastBuyDivergenceAgeArrayIndex, array.get(divArrShortEntry, lastBuyDivergenceAgeArrayIndex) + 1)
+    
+if (array.get(divArrShortExit, lastSellDivergenceAgeArrayIndex) > 0)
+    //lastSellDivergenceAgeShort := array.get(divArrShort, lastSellDivergenceAgeArrayIndex) + 1
+    array.set(divArrShortExit, lastSellDivergenceAgeArrayIndex, array.get(divArrShortExit, lastSellDivergenceAgeArrayIndex) + 1)  
+else if (array.get(divArrShortExit, lastBuyDivergenceAgeArrayIndex) > 0)
+    //lastSellDivergenceAgeShort := array.get(divArrShort, lastSellDivergenceAgeArrayIndex) + 1
+    array.set(divArrShortExit, lastBuyDivergenceAgeArrayIndex, array.get(divArrShortExit, lastBuyDivergenceAgeArrayIndex) + 1)
+    
+if (array.get(divArrLongEntry, lastSellDivergenceAgeArrayIndex) > 0)
+    //lastSellDivergenceAgeShort := array.get(divArrShort, lastSellDivergenceAgeArrayIndex) + 1
+    array.set(divArrLongEntry, lastSellDivergenceAgeArrayIndex, array.get(divArrLongEntry, lastSellDivergenceAgeArrayIndex) + 1)  
+else if (array.get(divArrLongEntry, lastBuyDivergenceAgeArrayIndex) > 0)
+    //lastSellDivergenceAgeShort := array.get(divArrShort, lastSellDivergenceAgeArrayIndex) + 1
+    array.set(divArrLongEntry, lastBuyDivergenceAgeArrayIndex, array.get(divArrLongEntry, lastBuyDivergenceAgeArrayIndex) + 1)  
+    
+if (array.get(divArrLongExit, lastSellDivergenceAgeArrayIndex) > 0)
+    //lastSellDivergenceAgeShort := array.get(divArrShort, lastSellDivergenceAgeArrayIndex) + 1
+    array.set(divArrLongExit, lastSellDivergenceAgeArrayIndex, array.get(divArrLongExit, lastSellDivergenceAgeArrayIndex) + 1)  
+else if (array.get(divArrLongExit, lastBuyDivergenceAgeArrayIndex) > 0)
+    //lastSellDivergenceAgeShort := array.get(divArrShort, lastSellDivergenceAgeArrayIndex) + 1
+    array.set(divArrLongExit, lastBuyDivergenceAgeArrayIndex, array.get(divArrLongExit, lastBuyDivergenceAgeArrayIndex) + 1)  
+    
+//if (lastSellDivergenceAgeLong > 0)
+//    lastSellDivergenceAgeLong := lastSellDivergenceAgeLong + 1
+//else if (lastBuyDivergenceAgeLong > 0)
+//    lastBuyDivergenceAgeLong := lastBuyDivergenceAgeLong + 1
+    
+// nls2
+
+//if CrossDown Bollinger Top and vol_condition:
+//    if close of price > sma_fast(per 20):
+//        if BBW < VLI_top:
+//            if low_volatility_level:
+//                if sma_mid (per 50) > sma_veryslow (per 200):
+//                    long
+//            else
+//                long
+//        elseif sma_slow (per 100) > sma_veryslow (per 200):
+//            long
+//            stoploss at: low of last candle
+//            if trade profitover 3% add stop win at 1%
+
+//if CrossDown Bollinger Bot and vol_condition:
+//    close
+//# stoploss and stopwin like in Long 5
+
+//stoploss: at 5% below low of entrycandle
+//stopwin: if tradeprofit over 20% add stopwin at 15%
+//if tradeprofit over 25% add stopwin at 20%
+//if tradeprofit over 30% add stopwin at 25%
+//if tradeprofit over 35% add stopwin at 30%
+//if tradeprofit over 40% add stopwin at 35%  
+
+// nls2 short
+
+//stoploss at HighestHigh (per 20)
+//if tradeprofit over 10%: stoploss at HH (per 10)
+//if tradeprofit over 15%: stoploss at HH (per 5)
+//stopwin: if tradeprofit over 25% add stopwin at 20%
+//if tradeprofit over 30% add stopwin at 25%
+//if tradeprofit over 35% add stopwin at 30%
+//if tradeprofit over 40% add stopwin at 35%    
+
+plot(distanceToStartOfSqueeze, title="distanceToStartOfSqueeze", display = display.data_window)
+plot(squeeze_started ? 1 : 0, title="squeeze_started", display = display.data_window)
+plot(channelSize, title="channelSize", display = display.data_window)
+plot((ta.sma(bbw_short, 200)), title="(ta.sma(bbw_short, 200) ", display = display.data_window)
+plot(bbw_short, title="bbw_short", display = display.data_window)
+plot(bbw, title="bbw", display = display.data_window)
+plot(resulting_close, title="resulting_close", display = display.data_window)

@@ -5,6 +5,7 @@ import time
 import pandas as pd
 from heatmap import create_heatmap, get_parameter_ranges
 from strategy_utils import get_available_strategies, fetch_data, print_logo, get_valid_date, get_trading_pairs
+from html_viewer import print_viewer_info, public_base_url
 from fetcher import OHLCFetcher
 
 def get_user_inputs():
@@ -39,6 +40,7 @@ def get_user_inputs():
 def run_heatmap_for_pairs():
     # Print logo
     print_logo()
+    print_viewer_info()
     
     print("AUTOMATOR - Heatmap Generator and Strategy Backtester")
     
@@ -150,6 +152,7 @@ def run_heatmap_for_pairs():
     
     print(f"\nAutomation complete! Results saved in: {output_dir}")
     print(f"Check {log_file} for detailed execution log")
+    print(f"\nOpen all results in the browser: {public_base_url()}/")
 
 if __name__ == "__main__":
     run_heatmap_for_pairs() 

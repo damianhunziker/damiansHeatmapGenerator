@@ -2,12 +2,12 @@ import altair as alt
 import pandas as pd
 import numpy as np
 from strategy_utils import get_user_inputs, fetch_data, get_parameter_ranges, print_logo, create_performance_chart
+from html_viewer import publish_file, print_viewer_info
 from classes.trade_analyzer import TradeAnalyzer
 import itertools
 from tqdm import tqdm
 import multiprocessing
 import os
-import webbrowser
 import altair_saver
 import matplotlib.pyplot as plt
 
@@ -146,27 +146,6 @@ def generate_pnl_image(args):
     )
     
     return idx, image_path
-
-def open_file(file_path):
-    """Open a file with the default application on any operating system"""
-    import platform
-    import subprocess
-    
-    try:
-        system = platform.system().lower()
-        
-        if system == 'darwin':  # macOS
-            subprocess.run(['open', file_path], check=True)
-        elif system == 'windows':
-            os.startfile(file_path)  # Windows-specific function
-        elif system == 'linux':
-            subprocess.run(['xdg-open', file_path], check=True)
-        else:
-            print(f"Unsupported operating system: {system}")
-            print(f"Please open the file manually: {file_path}")
-    except Exception as e:
-        print(f"Could not open file automatically: {e}")
-        print(f"Please open the file manually: {file_path}")
 
 def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, interval, asset, strategy_name, start_date=None, end_date=None):
     """Creates a heatmap of strategy results for different parameter combinations"""
@@ -426,10 +405,11 @@ def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity,
         file.write(html_content)
 
     print(f"\nHeatmap saved as: {file_path}")
-    open_file(file_path)
+    publish_file(file_path, label=f"Heatmap - {strategy_name} {asset} {interval}")
 
 if __name__ == "__main__":
     print_logo()
+    print_viewer_info()
     
     print("HEATMAP - Heatmap Generator and Strategy Backtester")
     

@@ -3,6 +3,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
+from html_viewer import publish_figure
 
 def load_tv_trades():
     """Load TradingView trades from CSV"""
@@ -451,8 +452,8 @@ def main():
         fig = create_deviation_chart()
         
         # Save the chart
-        output_file = "strategy_deviations_chart.html"
-        fig.write_html(output_file)
+        output_file = "html_cache/strategy_deviations_chart.html"
+        publish_figure(fig, output_file, label="Strategy Deviations Chart")
         
         print(f"\n✅ Chart saved as {output_file}")
         print("📈 Chart includes:")
@@ -465,12 +466,6 @@ def main():
         print("   • Visual identification of timing differences")
         print("   • Quantification of trade execution gaps")
         print("   • Performance impact assessment")
-        
-        # Also show the plot if in interactive environment
-        try:
-            fig.show()
-        except:
-            print("   (Interactive display not available - check HTML file)")
             
     except Exception as e:
         print(f"❌ Error creating chart: {e}")

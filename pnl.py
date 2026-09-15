@@ -4,7 +4,7 @@ from strategy_utils import get_user_inputs, fetch_data, get_strategy_inputs, pri
 from classes.data_fetcher import OHLCFetcher
 import numpy as np
 from classes.trade_analyzer import TradeAnalyzer
-import webbrowser
+from html_viewer import publish_file, print_viewer_info
 import os
 import pandas as pd
 
@@ -710,10 +710,11 @@ def create_interactive_chart(timeframe_data, strategy_class, strategy_params, la
     if results_short:
         print(f"Short Only: {len([t for t in results_short['trades'] if t[4] is not None])} trades, Net P/L: ${results_short['metrics']['total_net_profit']:.2f}")
     
-    webbrowser.open("file://" + os.path.realpath("html_cache/results.html"))
+    publish_file("html_cache/results.html", label="PnL Analysis - Results")
 
 if __name__ == "__main__":
     print_logo()
+    print_viewer_info()
    
     print("PNL - Heatmap Generator und Strategie Backtester")
     

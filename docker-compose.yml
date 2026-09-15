@@ -1,0 +1,54 @@
+x-app-volumes: &app-volumes
+  # Source code (live edit on the host)
+  - .:/app
+  # Generated / cached data, externalized to a host folder outside the tree
+  - ./.docker-data/ohlc_cache:/app/ohlc_cache
+  - ./.docker-data/data_cache:/app/data_cache
+  - ./.docker-data/html_cache:/app/html_cache
+  - ./.docker-data/pnl_cache:/app/pnl_cache
+  - ./.docker-data/automator_html:/app/automator_html
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DEV_UID: ${DEV_UID:-1000}
+        DEV_GID: ${DEV_GID:-1000}
+        DEV_USER: ${DEV_USER:-dev}
+    image: damians-heatmap-generator:dev
+    container_name: damians-heatmap-dev
+    working_dir: /app
+    init: true
+    stdin_open: true
+    tty: true
+    command: sleep infinity
+    environment:
+      PYTHONUNBUFFERED: "1"
+      MPLBACKEND: "Agg"
+      HEATMAP_IN_DOCKER: "1"
+      HEATMAP_VIEWER_PORT: "8900"
+    volumes: *app-volumes
+
+  # Persistent static file server for all generated HTML reports.
+  # Binds to localhost only (never exposed to the internet).
+  viewer:
+    image: damians-heatmap-generator:dev
+    container_name: damians-heatmap-viewer
+    working_dir: /app
+    depends_on:
+      - app
+    command:
+      - python
+      - -m
+      - http.server
+      - "8900"
+      - --bind
+      - 0.0.0.0
+      - --directory
+      - /app
+    ports:
+      - "127.0.0.1:8900:8900"
+    restart: unless-stopped
+    volumes: *app-volumes

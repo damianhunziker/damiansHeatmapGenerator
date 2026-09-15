@@ -11,4 +11,5 @@ classes/strategies/*
 classes/indicators/*
 /live_strategies/
 /test/
+.docker-data/
 

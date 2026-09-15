@@ -73,6 +73,10 @@ class OHLCFetcher:
         """Fetches OHLC data from Binance API."""
         BINANCE_API_URL = "https://api.binance.com/api/v3/klines"
         LIMIT = 3000  # Max candles per request
+        MAX_RETRIES = 5
+        RETRY_BACKOFF = 1.0  # seconds, doubles per attempt
+
+        session = requests.Session()
 
         def fetch_ohlc(symbol, interval, start_time, limit=3000):
             params = {
@@ -81,9 +85,21 @@ class OHLCFetcher:
                 "startTime": start_time,
                 "limit": limit
             }
-            response = requests.get(BINANCE_API_URL, params=params)
-            response.raise_for_status()
-            return response.json()
+            last_error = None
+            for attempt in range(MAX_RETRIES + 1):
+                try:
+                    response = session.get(BINANCE_API_URL, params=params, timeout=30)
+                    response.raise_for_status()
+                    return response.json()
+                except requests.exceptions.RequestException as error:
+                    last_error = error
+                    if attempt >= MAX_RETRIES:
+                        break
+                    backoff = RETRY_BACKOFF * (2 ** attempt)
+                    print(f"Request failed ({error.__class__.__name__}), retrying in {backoff:.1f}s "
+                          f"[{attempt + 1}/{MAX_RETRIES}]...")
+                    time.sleep(backoff)
+            raise last_error
 
         candles = []
         start_time = 0  # Start from the earliest available data
