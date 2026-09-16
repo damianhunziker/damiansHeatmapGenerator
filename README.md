@@ -337,18 +337,18 @@ python test.py --schema --api
 | `series` | per-candle indicator/signal series (see below) |
 
 Heatmap parameter grids are passed as JSON. A grid of `0.7..0.9` (step `0.1`)
-× `1.0..1.1` (step `0.1`) with PnL images disabled:
+× `1.0..1.1` (step `0.1`):
 
 ```bash
 python test.py heatmap --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
-    --start_date=2024-01-01 --end_date=2024-03-01 --no_images --workers=1 \
+    --start_date=2024-01-01 --end_date=2024-03-01 --workers=1 \
     '--param_ranges={"entry_filter":{"min":0.7,"max":0.9,"step":0.1},"exit_filter":{"min":1.0,"max":1.1,"step":0.1}}' \
     --api
 ```
 
-`--no_images` skips the per-cell PnL PNG generation (much faster, ideal for
-agents). `--workers N` controls the multiprocessing pool (`--workers 1` runs
-serially). `--max_combos` (default `400`) guards against accidental huge grids.
+Per-cell PnL PNGs are always generated now (they drive the HTML hover overlay).
+`--workers N` controls the multiprocessing pool (`--workers 1` runs serially).
+`--max_combos` (default `400`) guards against accidental huge grids.
 
 ### Choosing heatmap parameters (free selection)
 
@@ -388,6 +388,122 @@ cell has a small `|profit − neighbor_mean|` and a `neighbor_min` not far below
 `profit`. Confirm the plateau on a different date range and across pairs with
 `automator`.
 
+### Derived parameters (exact KAMA scaling)
+
+KAMA has **three** bar-based parameters (the Efficiency-Ratio `length` and the
+EMA bounds `fast` / `slow`). Scaling KAMA cleanly means scaling **all three
+together** so it behaves like the same indicator on `k`-times longer bars —
+changing only one value does *not* scale it, it just distorts the behaviour.
+Because the EMA alpha is `2/(period+1)`, the exact rule is:
+
+```
+length' = k * length
+period' = k * (period + 1) - 1        # exact, for fast / slow
+```
+
+The naive approximation `period' ≈ k * period` is only correct for large
+periods (base 4, k=6 → 24 vs exact **29**).
+
+Instead of sweeping the three lengths by hand (which needs 3 axes, and half the
+grid violates `fast < slow`), sweep **one** `kama_scale` axis and *derive* the
+lengths from it with `derived_params`:
+
+```bash
+python test.py heatmap --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
+    --start_date=2024-01-01 --end_date=2024-03-01 --workers=1 \
+    '--param_ranges={"kama_scale":[1,2,3,4,6,8],"entry_filter":{"min":0.5,"max":1.5,"step":0.25}}' \
+    '--derived_params={
+        "entry_kama_length":{"scale":"kama_scale","base":16,"kind":"window"},
+        "entry_kama_fast":{"scale":"kama_scale","base":4,"kind":"alpha"},
+        "entry_kama_slow":{"scale":"kama_scale","base":24,"kind":"alpha"},
+        "kama2_length":{"scale":"kama_scale","base":15,"kind":"window"},
+        "kama2_fast":{"scale":"kama_scale","base":3,"kind":"alpha"},
+        "kama2_slow":{"scale":"kama_scale","base":22,"kind":"alpha"},
+        "exit_kama_length":{"scale":"kama_scale","base":14,"kind":"window"},
+        "exit_kama_fast":{"scale":"kama_scale","base":2,"kind":"alpha"},
+        "exit_kama_slow":{"scale":"kama_scale","base":20,"kind":"alpha"}}' \
+    --api
+```
+
+Each entry: `scale` is the swept axis name, `base` the unscaled value, `kind`
+is `window` (plain rolling window, e.g. the ER length) or `alpha` (EMA bound,
+scaled exactly). The derived values are visible in `data.derived_params`.
+
+Notes:
+
+- **Warmup:** KAMA needs ~`6 × longest period` bars to converge. If the
+  available history before `start_date` is too short, the envelope returns a
+  `warnings` entry (e.g. `KAMA warmup may be insufficient ...`) — a warning, not
+  an error, so you can still inspect the result.
+- Prefer **log-spaced** scale values (`1,2,3,4,6,8,12,...`); scaling is
+  multiplicative, so linear steps sample the space unevenly.
+- `derived_params` is accepted by `run_heatmap` / `run_automator` (MCP) and the
+  `heatmap` / `automator` `--api` tools.
+
+### Generic parameter resolution (resolvers)
+
+`derived_params` is the KAMA special case of a general mechanism: any **virtual**
+parameter can be resolved into any number of **concrete** strategy parameters
+via declarative, whitelisted op-trees (no code execution). Configure it in
+`configs/param_resolvers.json` and/or inline via `resolvers` /
+`resolver_config`, then sweep the virtual axis directly:
+
+```bash
+python test.py heatmap --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
+    --start_date=2024-01-01 --end_date=2024-06-01 --workers=1 \
+    '--param_ranges={"kama_normalized_length":[1,2,3,4,6,8],"entry_filter":{"min":0.5,"max":1.5,"step":0.25}}' \
+    --api
+```
+
+`kama_normalized_length` is resolved (default config, **all_exact**) into
+`entry_kama_length/fast/slow`, `kama2_*`, `exit_kama_*` (LiveKAMASSLStrategy) or
+`slow_kama_length/fast/slow` (DMXStrategy). At the API/MCP boundary the grid is
+normalised: a swept resolver **`id`** is converted to its canonical virtual
+**`input`** (in `param_ranges` and `derived_params`), and the mapping is
+returned in `data.param_aliases`. So sweeping `slow_kama_normalized_length`
+(DMX resolver id) is converted to `kama_normalized_length` automatically. A
+virtual parameter that no resolver resolves for the running strategy raises a
+clear error instead of silently producing identical cells. Inline resolvers
+override by `id`; `--resolver_config=/path.json` loads a different file. The
+applied resolvers are returned in `data.resolvers`. Extend via hooks,
+middlewares and custom ops (`core.params.hook` / `middleware` / `register_op`).
+
+Virtual parameters accept the same sweep specs as any parameter — a list or
+`{"min","max","step"}` / `{"min","max","count"}` / `{"values":[...]}`:
+
+```bash
+# explicit min/max/step on the virtual axis
+'--param_ranges={"kama_normalized_length":{"min":1,"max":8,"step":1},"entry_filter":{"min":0.5,"max":1.5,"step":0.25}}'
+
+# or use the range declared in the resolver config
+'--param_ranges={"kama_normalized_length":"config","entry_filter":{"min":0.5,"max":1.5,"step":0.25}}'
+
+# or auto-inject configured virtual ranges (only for resolvers matching the strategy)
+--param_ranges='{"entry_filter":{"min":0.5,"max":1.5,"step":0.25}}' --use_config_ranges=true
+```
+
+Declare defaults in the config (`virtual_params`, or a `range` on a resolver):
+```json
+"virtual_params": {
+  "kama_normalized_length": {"range": {"min": 1, "max": 8, "step": 1}}
+}
+```
+
+Over MCP the same works via `run_heatmap` / `run_automator`
+(`resolvers`, `resolver_config`, `use_config_ranges`); `get_schema` returns a
+`resolvers` section listing the default virtual parameters and their ranges:
+
+```python
+run_heatmap(asset="BTCUSDT", strategy="LiveKAMASSLStrategy",
+            start_date="2024-01-01", end_date="2024-06-01",
+            param_ranges={"kama_normalized_length": {"min": 1, "max": 8, "step": 1},
+                          "entry_filter": {"min": 0.5, "max": 1.5, "step": 0.25}},
+            workers=1)
+```
+
+See [`docs/parameter-resolution-suite.md`](docs/parameter-resolution-suite.md)
+for the full design (op catalogue, hooks/middlewares, data flow).
+
 ### Runtime debugging with `series`
 
 `series` returns per-candle indicator and signal columns so a model can answer
@@ -407,35 +523,169 @@ Options: `--columns a,b,c`, `--tail N`, `--format json|parquet`,
 
 ## MCP server
 
-`mcp_server/server.py` exposes the API over the Model Context Protocol (stdio).
-It calls `python test.py <tool> ... --api` as a subprocess (keeping the MCP
-stdout channel clean) and returns the JSON envelope. It opens no network ports.
+`mcp_server/server.py` exposes the API over the **Model Context Protocol**
+(stdio transport). Each tool call runs `python test.py <tool> ... --api` as a
+subprocess and returns the JSON envelope. This keeps the MCP stdout channel
+clean (the tools print heavily and use multiprocessing). The server opens **no
+network ports** — it only speaks JSON-RPC on stdin/stdout.
 
-Tools: `get_schema`, `fetch_data`, `run_pnl`, `run_chart_analysis`,
-`run_heatmap`, `run_automator`, `get_series`, `run_tool`, `list_artifacts`,
-`read_artifact`.
+Tools exposed:
 
-Because the strategy dependencies (TA-Lib, ccxt, ib_async) live in the Docker
-image, run the server inside the `app` container:
+| Tool | Purpose |
+|------|---------|
+| `get_schema` | strategies, parameters, parameter ranges, intervals |
+| `fetch_data` | ensure/refresh the OHLC cache for an asset/interval |
+| `run_pnl` | PnL metrics + trade list (both/long/short) |
+| `run_chart_analysis` | interactive chart + summary + trades |
+| `run_heatmap` | parameter sweep: `grid`, `best`, `robustness` |
+| `run_automator` | heatmap across multiple pairs |
+| `get_series` | per-candle indicator/signal series (debugging) |
+| `run_tool` | generic escape hatch for any tool |
+| `list_artifacts` / `read_artifact` | list/read generated reports |
+
+### 1. Prerequisites
+
+- The Docker container is running:
+
+  ```bash
+  docker compose up -d
+  ```
+
+- The `mcp` package is installed **inside the container** (it is listed in
+  `requirements.txt`). If your image predates it:
+
+  ```bash
+  # quick (running container only, lost on recreate)
+  docker compose exec app pip install mcp
+
+  # permanent (rebuild the image)
+  docker compose build app && docker compose up -d
+  ```
+
+Because the strategy dependencies (TA-Lib, ccxt, ib_async) and the data caches
+live in the container, the MCP server must run **inside the container** — the
+client launches it via `docker exec -i`.
+
+### 2. Verify the server starts
 
 ```bash
+# starts the stdio server and waits for JSON-RPC on stdin (Ctrl-C to stop)
 docker exec -i damians-heatmap-dev python mcp_server/server.py
+
+# or just list the registered tools
+docker exec -i damians-heatmap-dev python -c \
+  "import mcp_server.server as s; print(sorted(t.name for t in s.mcp._tool_manager.list_tools()))"
 ```
 
-An MCP client (e.g. `opencode.json`) is configured as:
+### 3. Register with your MCP client
+
+The only difference between clients is the config file and the key
+(`mcp` vs `mcpServers`); the launch command is always
+`docker exec -i damians-heatmap-dev python mcp_server/server.py`.
+
+**opencode** — `~/.config/opencode/opencode.json`:
 
 ```json
-"damians-heatmap": {
-  "type": "local",
-  "command": ["docker", "exec", "-i", "damians-heatmap-dev", "python", "mcp_server/server.py"],
-  "enabled": true,
-  "timeout": 600000,
-  "autoApprove": ["get_schema", "fetch_data", "run_pnl", "run_chart_analysis", "get_series", "list_artifacts", "read_artifact"]
+{
+  "mcp": {
+    "damians-heatmap": {
+      "type": "local",
+      "command": ["docker", "exec", "-i", "damians-heatmap-dev", "python", "mcp_server/server.py"],
+      "enabled": true,
+      "timeout": 600000,
+      "autoApprove": ["get_schema", "fetch_data", "run_pnl", "run_chart_analysis", "get_series", "list_artifacts", "read_artifact"]
+    }
+  }
 }
 ```
 
-Environment overrides: `HEATMAP_PROJECT_ROOT`, `HEATMAP_PYTHON`,
-`HEATMAP_MCP_TIMEOUT` (subprocess timeout in seconds, default `1500`).
+**Claude Desktop** — `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "damians-heatmap": {
+      "command": "docker",
+      "args": ["exec", "-i", "damians-heatmap-dev", "python", "mcp_server/server.py"]
+    }
+  }
+}
+```
+
+**Cursor / other stdio clients** — command `docker`, args
+`exec -i damians-heatmap-dev python mcp_server/server.py`.
+
+After editing the config, **restart the client** so it picks up the new server.
+
+### 4. Use it
+
+Once connected, the agent can call the tools directly, e.g.:
+
+```text
+run_pnl(asset="BTCUSDT", strategy="LiveKAMASSLStrategy",
+        start_date="2024-01-01", end_date="2024-03-01", direction="both")
+
+run_heatmap(asset="BTCUSDT", strategy="LiveKAMASSLStrategy",
+            start_date="2024-01-01", end_date="2024-03-01",
+            param_ranges={"entry_filter": {"min": 0.5, "max": 1.5, "step": 0.25},
+                          "exit_filter": {"min": 0.75, "max": 1.75, "step": 0.25}},
+            workers=1)
+
+get_series(asset="BTCUSDT", strategy="LiveKAMASSLStrategy",
+           start_date="2024-01-01", end_date="2024-02-01",
+           columns=["price_close", "long_entry", "long_exit", "exit_reason"], tail=500)
+```
+
+The strategy-debugging and heatmap-optimization skills (`strategy-debugging`,
+`heatmap-optimization`) document the full workflows.
+
+### 5. Configuration & environment
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `HEATMAP_PROJECT_ROOT` | parent of `mcp_server/` | project directory the tools run in |
+| `HEATMAP_PYTHON` | current interpreter | Python used to spawn `test.py` |
+| `HEATMAP_MCP_TIMEOUT` | `1500` | subprocess timeout in seconds (heavy heatmaps need more) |
+
+Set them in the client config (e.g. opencode `"environment": {...}`) if needed.
+
+### 6. Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| `No module named 'mcp'` | install it in the container (see step 1) |
+| `no output from test.py` | run the CLI directly (`python test.py <tool> ... --api`) and read `stderr` |
+| Client shows no tools | restart the client after editing the config |
+| Timeout on `run_heatmap` | lower the grid / `max_combos` or raise the timeout |
+| Viewer URLs unreachable | the viewer binds `127.0.0.1:8900`; open the URL on the host |
+
+
+## Tests
+
+The test suite uses `pytest` (dev dependency, see `requirements-dev.txt`).
+
+```bash
+# inside the container (has all strategy dependencies)
+docker compose exec app python -m pytest                 # all tests
+docker compose exec app python -m pytest -m "not slow"   # skip the heatmap sweep
+docker compose exec app python -m pytest -m slow         # only heavy tests
+```
+
+Coverage:
+
+| Area | Tests |
+|------|-------|
+| JSON serialization | `tests/test_serialize.py` (numpy/pandas/timestamps, inf/NaN, trades) |
+| CLI argument parsing | `tests/test_cli_args.py` (`--k=v`, `--flag`, JSON, list keys) |
+| API helpers | `tests/test_api_unit.py` (ranges, strategy params, lookback, envelope, schema) |
+| Heatmap results | `tests/test_heatmap_structured.py` (grid/best/robustness) |
+| `--api` end-to-end | `tests/test_api_integration.py` (pnl, chart_analysis, series, fetcher, schema) |
+| Heatmap sweep | `tests/test_api_slow.py` (marked `slow`) |
+| MCP server | `tests/test_mcp_server.py` (tool registration; skipped without `mcp`) |
+
+Tests are marked `integration` (use cached OHLC data) and `slow` (parameter
+sweeps). Data-dependent tests are skipped automatically when the cache is
+missing.
 
 ## Contributing
 
