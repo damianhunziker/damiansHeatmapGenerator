@@ -8,6 +8,7 @@ EXPECTED_TOOLS = {
     "get_schema", "fetch_data", "run_pnl", "run_chart_analysis",
     "run_heatmap", "run_automator", "get_series", "run_tool",
     "list_artifacts", "read_artifact",
+    "analyze_plateaus", "validate_plateau", "plot_plateau",
 }
 
 

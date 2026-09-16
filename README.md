@@ -331,7 +331,10 @@ python test.py --schema --api
 |------|-----------------|
 | `pnl` | `directions.{both,long,short}` with `metrics`, `trades`, `equity_curve`, `equity_curve_timestamps`, `pnl_performance`, `buy_hold`, `drawdown` |
 | `chart_analysis` | `summary` (equity, return, win rate, …), `trades`, `divergence_indicators` |
-| `heatmap` | `grid` (one entry per parameter combination), `best` (top-N by profit/net_profit/sharpe/drawdown), `robustness` (3×3 neighbourhood mean/min), `param_ranges`, `x_param`, `y_param` |
+| `heatmap` | `grid` (one entry per parameter combination), `best` (top-N by profit/net_profit/sharpe/drawdown), `robustness` (3×3 neighbourhood mean/min), `plateaus` (algorithmic region detection, see below), `sidecar` (JSON path with grid + plateaus), `param_ranges`, `x_param`, `y_param` |
+| `plateaus` | algorithmic plateau/region detection over a grid (`grid`, `grid_path` sidecar or a fresh heatmap): ranked `regions`, `best_region`, `representative`, `largest_rectangle` |
+| `validate_plateau` | walk-forward validation of a parameter region: per-window representative + `summary.consistency` |
+| `plot_plateau` | score matrix with region outlines rendered to a PNG |
 | `automator` | `output_dir`, `runs[]` (per pair: `ok`, `error`, `best`, `grid`, `artifact`) |
 | `fetcher` | `asset`, `interval`, `rows`, `start`, `end`, `cache_path` |
 | `series` | per-candle indicator/signal series (see below) |
@@ -347,7 +350,9 @@ python test.py heatmap --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
 ```
 
 Per-cell PnL PNGs are always generated now (they drive the HTML hover overlay).
-`--workers N` controls the multiprocessing pool (`--workers 1` runs serially).
+`--workers N` controls the multiprocessing pool for local runs; when a run is
+offloaded to the home server the server sets the parallelism itself (its own CPU
+count) and any client value is ignored, so cores are never left idle.
 `--max_combos` (default `400`) guards against accidental huge grids.
 
 ### Choosing heatmap parameters (free selection)
@@ -382,11 +387,50 @@ Constraints to keep in mind:
   available via `--api` and the MCP tool.
 
 The result contains `grid` (all combinations with metrics), `best` (top-N by
-profit / net_profit / sharpe / drawdown) and `robustness` (3×3 neighbourhood
-`neighbor_mean` / `neighbor_min`). Prefer **plateaus** over spikes: a stable
-cell has a small `|profit − neighbor_mean|` and a `neighbor_min` not far below
-`profit`. Confirm the plateau on a different date range and across pairs with
-`automator`.
+profit / net_profit / sharpe / drawdown), `robustness` (3×3 neighbourhood
+`neighbor_mean` / `neighbor_min`) and `plateaus` (algorithmic region detection).
+
+### Plateau detection
+
+`plateaus` is computed automatically from the underlying data matrix — never by
+reading pixels of the rendered heatmap.  The pipeline is: composite score
+(robust z-scores of sharpe / profit_factor / drawdown / trades, with a hard
+`min_trades` filter) → smoothing → local stability → threshold → morphology →
+connected regions → region scoring → representative cell.  Each region carries
+its parameter span, score statistics, `cv`, `boundary_penalty` and a
+`representative` cell (default: the `medoid`, i.e. the robust centre).  Tune it
+per call with `--plateau_config` (or the `plateau_config` argument):
+
+```bash
+python test.py heatmap --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
+    --start_date=2024-01-01 --end_date=2024-03-01 --workers=1 \
+    '--param_ranges={"entry_filter":{"min":0.7,"max":0.9,"step":0.1},"exit_filter":{"min":1.0,"max":1.1,"step":0.1}}' \
+    '--plateau_config={"min_trades":30,"threshold_k":0.5,"representative":"medoid"}' \
+    --api
+```
+
+Every heatmap also writes a JSON **sidecar** (`data.sidecar`) with the grid and
+the plateau analysis, so a later call can re-rank without re-running the
+backtest.  Dedicated tools:
+
+```bash
+# re-rank an existing grid with different weights (no backtest)
+python test.py plateaus --grid_path=html_cache/BTCUSDT_....json \
+    '--plateau_config={"weights":{"sharpe_ratio":1.0,"drawdown_pct":-0.8}}' --api
+
+# validate the region across walk-forward windows
+python test.py validate_plateau --asset=BTCUSDT --strategy=LiveKAMASSLStrategy \
+    --start_date=2024-01-01 --end_date=2024-06-01 --windows=3 \
+    '--region={"entry_filter":{"min":0.7,"max":0.9},"exit_filter":{"min":1.0,"max":1.1}}' --api
+
+# presentation overlay
+python test.py plot_plateau --grid_path=html_cache/BTCUSDT_....json
+```
+
+Prefer **plateaus** over spikes: a stable region has a small `cv` and a
+`representative` far from the search-space edge.  Confirm it on a different date
+range (`validate_plateau`) and across pairs with `automator`.  Full algorithm and
+config reference: [`docs/plateau-detection.md`](docs/plateau-detection.md).
 
 ### Derived parameters (exact KAMA scaling)
 
@@ -537,7 +581,10 @@ Tools exposed:
 | `fetch_data` | ensure/refresh the OHLC cache for an asset/interval |
 | `run_pnl` | PnL metrics + trade list (both/long/short) |
 | `run_chart_analysis` | interactive chart + summary + trades |
-| `run_heatmap` | parameter sweep: `grid`, `best`, `robustness` |
+| `run_heatmap` | parameter sweep: `grid`, `best`, `robustness`, `plateaus` |
+| `analyze_plateaus` | algorithmic plateau/region detection on a grid (no re-backtest) |
+| `validate_plateau` | walk-forward validation of a parameter region |
+| `plot_plateau` | score matrix + region outlines rendered to a PNG |
 | `run_automator` | heatmap across multiple pairs |
 | `get_series` | per-candle indicator/signal series (debugging) |
 | `run_tool` | generic escape hatch for any tool |
@@ -593,7 +640,7 @@ The only difference between clients is the config file and the key
       "command": ["docker", "exec", "-i", "damians-heatmap-dev", "python", "mcp_server/server.py"],
       "enabled": true,
       "timeout": 600000,
-      "autoApprove": ["get_schema", "fetch_data", "run_pnl", "run_chart_analysis", "get_series", "list_artifacts", "read_artifact"]
+      "autoApprove": ["get_schema", "fetch_data", "run_pnl", "run_chart_analysis", "get_series", "list_artifacts", "read_artifact", "analyze_plateaus", "plot_plateau"]
     }
   }
 }

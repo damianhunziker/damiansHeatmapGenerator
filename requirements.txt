@@ -10,6 +10,7 @@ prompt_toolkit>=3.0.0
 yfinance>=0.2.0
 scipy>=1.10.0
 scikit-learn>=1.2.0
+scikit-image>=0.22.0
 TA-Lib>=0.4.28
 ccxt>=4.0.0
 mplfinance>=0.12.10b0

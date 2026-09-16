@@ -218,8 +218,19 @@ def validate_parameters(exec_name: str, params: Dict[str, Any]) -> List[str]:
     
     return errors
 
+_API_ONLY_TOOLS = {"plateaus", "validate_plateau", "plot_plateau"}
+
+
 def run_executable(exec_name: str, params: Dict[str, Any]) -> None:
     """Run an executable with parameters."""
+    # Grid/plateau tools are JSON-first; they work without asset/date validation.
+    if exec_name in _API_ONLY_TOOLS:
+        from core import api
+
+        envelope = api.run_tool(exec_name, params)
+        print(api.dumps(envelope, indent=2))
+        return
+
     # Validate parameters
     errors = validate_parameters(exec_name, params)
     if errors:

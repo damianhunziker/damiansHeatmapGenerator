@@ -223,7 +223,6 @@ def run_heatmap(asset: str, strategy: str, param_ranges: dict = None,
                 use_config_ranges: bool = False,
                 start_date: str = None, end_date: str = None, interval: str = "4h",
                 initial_equity: float = 10000, fee_pct: float = 0.04,
-                workers: int = None,
                 max_combos: int = 400, params: dict = None,
                 timeout: int = None) -> dict:
     """Sweep a parameter grid. Returns grid, best cells, robustness and HTML URL.
@@ -263,7 +262,90 @@ def run_heatmap(asset: str, strategy: str, param_ranges: dict = None,
         resolver_config=resolver_config, use_config_ranges=use_config_ranges,
         start_date=start_date, end_date=end_date, interval=interval,
         initial_equity=initial_equity, fee_pct=fee_pct,
-        workers=workers, max_combos=max_combos,
+        max_combos=max_combos,
+    ), timeout=timeout)
+
+
+@mcp.tool()
+def analyze_plateaus(grid: list = None, grid_path: str = None,
+                     asset: str = None, strategy: str = None,
+                     param_ranges: dict = None, plateau_config: dict = None,
+                     x_param: str = None, y_param: str = None,
+                     start_date: str = None, end_date: str = None,
+                     interval: str = "4h", initial_equity: float = 10000,
+                     fee_pct: float = 0.04, max_combos: int = 400,
+                     params: dict = None, timeout: int = None) -> dict:
+    """Find robust parameter *plateaus* algorithmically (no vision).
+
+    Operates on the underlying data matrix, never on a rendered image:
+    composite score -> smoothing -> local stability -> threshold -> morphology
+    -> connected regions -> region scoring -> representative cell.
+
+    Provide the grid in one of three ways (cheapest first):
+    - ``grid``: rows from a previous ``run_heatmap`` (or any list of records
+      with ``x``, ``y`` and metric columns);
+    - ``grid_path``: the JSON sidecar written next to a heatmap HTML
+      (``data.sidecar`` from ``run_heatmap``);
+    - ``asset`` + ``strategy`` + ``param_ranges``: runs a fresh heatmap first.
+
+    ``plateau_config`` tunes the analysis without re-running the backtest, e.g.::
+
+        analyze_plateaus(grid=..., plateau_config={
+            "min_trades": 30,
+            "weights": {"sharpe_ratio": 1.0, "drawdown_pct": -0.7},
+            "threshold_k": 0.5,
+            "min_area": 6,
+            "representative": "medoid",
+        })
+
+    Returns ``regions`` (ranked, with parameter ranges, score stats, area, cv,
+    boundary penalty and a representative cell), ``best_region``,
+    ``largest_rectangle`` and the config used.
+    """
+    return _call("plateaus", _merge(
+        params, grid=grid, grid_path=grid_path, asset=asset, strategy=strategy,
+        param_ranges=param_ranges, plateau_config=plateau_config,
+        x_param=x_param, y_param=y_param, start_date=start_date,
+        end_date=end_date, interval=interval, initial_equity=initial_equity,
+        fee_pct=fee_pct, max_combos=max_combos,
+    ), timeout=timeout)
+
+
+@mcp.tool()
+def validate_plateau(region: dict = None, param_ranges: dict = None,
+                     asset: str = None, strategy: str = None,
+                     start_date: str = None, end_date: str = None,
+                     interval: str = "4h", windows: int = 3,
+                     plateau_config: dict = None, initial_equity: float = 10000,
+                     fee_pct: float = 0.04, max_combos: int = 400,
+                     params: dict = None, timeout: int = None) -> dict:
+    """Walk-forward validation of a parameter region across ``windows`` slices.
+
+    ``region`` may be a ``param_ranges`` spec (``{"a": {"min":..,"max":..}}``)
+    or the ``best_region`` block returned by ``analyze_plateaus``.  Each window
+    is a fresh heatmap restricted to that region; the response reports the
+    representative cell per window plus a consistency summary.  A real plateau
+    keeps producing a region; an overfit spike does not.
+    """
+    return _call("validate_plateau", _merge(
+        params, region=region, param_ranges=param_ranges, asset=asset,
+        strategy=strategy, start_date=start_date, end_date=end_date,
+        interval=interval, windows=windows, plateau_config=plateau_config,
+        initial_equity=initial_equity, fee_pct=fee_pct, max_combos=max_combos,
+    ), timeout=timeout)
+
+
+@mcp.tool()
+def plot_plateau(grid: list = None, grid_path: str = None, asset: str = None,
+                 strategy: str = None, param_ranges: dict = None,
+                 plateau_config: dict = None, output: str = None,
+                 title: str = None, params: dict = None,
+                 timeout: int = None) -> dict:
+    """Render the score matrix with region outlines to a PNG (presentation only)."""
+    return _call("plot_plateau", _merge(
+        params, grid=grid, grid_path=grid_path, asset=asset, strategy=strategy,
+        param_ranges=param_ranges, plateau_config=plateau_config,
+        output=output, title=title,
     ), timeout=timeout)
 
 
@@ -275,7 +357,6 @@ def run_automator(strategy: str, pairs: list = None, param_ranges: dict = None,
                   start_date: str = None, end_date: str = None,
                   interval: str = "4h", higher_tf: str = "1d",
                   initial_equity: float = 1000, fee_pct: float = 0.04,
-                  workers: int = None,
                   max_combos: int = 400, params: dict = None,
                   timeout: int = None) -> dict:
     """Run the heatmap across multiple pairs. Returns per-pair results."""
@@ -285,7 +366,7 @@ def run_automator(strategy: str, pairs: list = None, param_ranges: dict = None,
         resolver_config=resolver_config, use_config_ranges=use_config_ranges,
         start_date=start_date, end_date=end_date, interval=interval,
         higher_tf=higher_tf, initial_equity=initial_equity, fee_pct=fee_pct,
-        workers=workers, max_combos=max_combos,
+        max_combos=max_combos,
     ), timeout=timeout)
 
 

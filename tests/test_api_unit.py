@@ -29,10 +29,129 @@ class _StrategyWithParams:
 
 def test_schema_exposes_all_tools():
     schema = api.get_schema()
-    for tool in ["pnl", "chart_analysis", "heatmap", "automator", "fetcher", "series"]:
+    for tool in ["pnl", "chart_analysis", "heatmap", "automator", "fetcher",
+                 "series", "plateaus", "validate_plateau", "plot_plateau"]:
         assert tool in schema["tools"]
     assert schema["intervals"]
     assert isinstance(schema["strategies"], dict)
+
+
+def _plateau_grid():
+    rows = []
+    for x in range(6):
+        for y in range(6):
+            good = 2 <= x <= 4 and 2 <= y <= 4
+            rows.append({
+                "x": x, "y": y,
+                "sharpe_ratio": 2.0 if good else 0.5,
+                "profit_factor": 2.0 if good else 1.0,
+                "drawdown_pct": 10.0 if good else 30.0,
+                "num_trades": 100 if good else 50,
+                "profit": 30.0 if good else 5.0,
+            })
+    return rows
+
+
+def test_plateaus_tool_runs_on_inline_grid():
+    envelope = api.run_tool("plateaus", {
+        "grid": _plateau_grid(),
+        "param_ranges": {"x": list(range(6)), "y": list(range(6))},
+    })
+    assert envelope["ok"] is True
+    data = envelope["data"]
+    assert data["source"] == "inline-grid"
+    assert data["x_param"] == "x" and data["y_param"] == "y"
+    assert data["region_count"] >= 1
+
+
+def test_plateaus_tool_derives_ranges_from_grid():
+    envelope = api.run_tool("plateaus", {"grid": _plateau_grid()})
+    assert envelope["ok"] is True
+    assert envelope["data"]["x_param"] == "x"
+
+
+def test_plateaus_tool_reads_sidecar(tmp_path):
+    import json
+
+    sidecar = tmp_path / "hm.json"
+    sidecar.write_text(json.dumps({
+        "grid": _plateau_grid(),
+        "param_ranges": {"x": list(range(6)), "y": list(range(6))},
+    }))
+    envelope = api.run_tool("plateaus", {"grid_path": str(sidecar)})
+    assert envelope["ok"] is True
+    assert envelope["data"]["source"] == str(sidecar)
+
+
+def test_normalize_region_accepts_best_region_block():
+    block = {"x": {"param": "a", "min": 1, "max": 3},
+             "y": {"param": "b", "min": 4, "max": 6}}
+    assert api._normalize_region(block) == {
+        "a": {"min": 1, "max": 3}, "b": {"min": 4, "max": 6}}
+    plain = {"a": {"min": 1, "max": 3}}
+    assert api._normalize_region(plain) is plain
+
+
+def test_validate_plateau_requires_region():
+    envelope = api.run_tool("validate_plateau", {"start_date": "2024-01-01",
+                                                 "end_date": "2024-02-01"})
+    assert envelope["ok"] is False
+    assert "region" in envelope["error"]
+
+
+def test_validate_plateau_splits_windows(monkeypatch):
+    calls = []
+
+    def fake_heatmap(params, options):
+        calls.append((params["start_date"], params["end_date"], params["param_ranges"]))
+        return {"plateaus": {
+            "region_count": 1,
+            "best_region": {"region_score": 1.5},
+            "representative": {"x": 1, "y": 2, "method": "medoid"},
+        }}, []
+
+    monkeypatch.setattr(api, "_run_heatmap", fake_heatmap)
+    envelope = api.run_tool("validate_plateau", {
+        "asset": "BTCUSDT", "strategy": "S",
+        "start_date": "2024-01-01", "end_date": "2024-03-31", "windows": 3,
+        "region": {"x": {"param": "a", "min": 1, "max": 3},
+                   "y": {"param": "b", "min": 4, "max": 6}},
+    })
+    assert envelope["ok"] is True
+    data = envelope["data"]
+    assert len(calls) == 3
+    assert set(calls[0][2].keys()) == {"a", "b"}
+    assert data["summary"]["windows_with_plateau"] == 3
+    assert data["summary"]["consistency"] == 1.0
+    assert data["summary"]["representative_mean"] == {"x": 1.0, "y": 2.0}
+
+
+def test_validate_plateau_reports_failed_windows(monkeypatch):
+    def flaky_heatmap(params, options):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(api, "_run_heatmap", flaky_heatmap)
+    envelope = api.run_tool("validate_plateau", {
+        "asset": "BTCUSDT", "strategy": "S",
+        "start_date": "2024-01-01", "end_date": "2024-02-01", "windows": 2,
+        "region": {"a": {"min": 1, "max": 3}},
+    })
+    assert envelope["ok"] is True
+    data = envelope["data"]
+    assert data["summary"]["consistency"] == 0.0
+    assert all(not entry["ok"] for entry in data["results"])
+
+
+def test_plot_plateau_writes_artifact(tmp_path):
+    out = tmp_path / "overlay.png"
+    envelope = api.run_tool("plot_plateau", {
+        "grid": _plateau_grid(),
+        "param_ranges": {"x": list(range(6)), "y": list(range(6))},
+        "output": str(out),
+    })
+    assert envelope["ok"] is True
+    assert out.exists()
+    assert envelope["artifacts"][0]["path"] == str(out)
 
 
 def test_parse_ranges_from_list():

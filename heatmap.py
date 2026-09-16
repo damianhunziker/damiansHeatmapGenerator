@@ -4,6 +4,7 @@ import numpy as np
 from core.strategy_utils import get_user_inputs, fetch_data, get_parameter_ranges, print_logo, create_performance_chart, instantiate_strategy
 from core.kama_scaling import expand_derived, max_effective_period
 from core.params import resolve_params, resolver_max_period
+from core import plateaus as plateau_analysis
 from core.html_viewer import publish_file, print_viewer_info
 from classes.trade_analyzer import TradeAnalyzer
 import itertools
@@ -166,8 +167,8 @@ def generate_pnl_image(args):
     
     return idx, image_path
 
-def _build_structured_results(df, param_ranges):
-    """Build the JSON-friendly grid, best-cells and robustness payload."""
+def _build_structured_results(df, param_ranges, plateau_config=None):
+    """Build the JSON-friendly grid, best-cells, robustness and plateau payload."""
     param_keys = list(param_ranges.keys())
     grid = df.to_dict(orient='records')
 
@@ -212,17 +213,27 @@ def _build_structured_results(df, param_ranges):
     except Exception:
         robustness = None
 
+    # Algorithmic plateau detection on the underlying matrix (never on the
+    # rendered image).  Best-effort: a failure here must not break the heatmap.
+    plateau_result = None
+    try:
+        plateau_result = plateau_analysis.detect_plateaus(
+            grid, param_ranges, plateau_config)
+    except Exception as exc:  # noqa: BLE001 - surfaced as a warning, not fatal
+        plateau_result = {'error': f'{exc.__class__.__name__}: {exc}'}
+
     return {
         'grid': grid,
         'best': best,
         'robustness': robustness,
+        'plateaus': plateau_result,
         'param_ranges': {k: np.asarray(v).tolist() for k, v in param_ranges.items()},
         'x_param': param_keys[0] if param_keys else None,
         'y_param': param_keys[1] if len(param_keys) > 1 else None,
     }
 
 
-def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, interval, asset, strategy_name, start_date=None, end_date=None, workers=None, derived_params=None, resolvers=None, resolver_snippets=None):
+def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, interval, asset, strategy_name, start_date=None, end_date=None, workers=None, derived_params=None, resolvers=None, resolver_snippets=None, plateau_config=None):
     """Creates a heatmap of strategy results for different parameter combinations.
 
     Returns a dict with the parameter grid (one entry per combination), the
@@ -319,7 +330,7 @@ def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity,
     df = pd.DataFrame(results_data)
 
     # Structured results for the machine-readable API (see core/api.py)
-    structured = _build_structured_results(df, param_ranges)
+    structured = _build_structured_results(df, param_ranges, plateau_config)
     structured['warnings'] = warnings
 
     # Determine color scale domains (using all combinations)
@@ -509,7 +520,40 @@ def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity,
     publish_file(file_path, label=f"Heatmap - {strategy_name} {asset} {interval}")
 
     structured['artifact'] = file_path
+    structured['sidecar'] = _write_sidecar(file_path, structured, {
+        'strategy': strategy_name,
+        'asset': asset,
+        'interval': interval,
+        'start_date': start_date,
+        'end_date': end_date,
+    })
     return structured
+
+
+def _write_sidecar(file_path, structured, meta):
+    """Persist grid + plateaus as JSON next to the HTML for later tool calls."""
+    import json
+
+    from core.serialize import to_jsonable
+
+    sidecar_path = os.path.splitext(file_path)[0] + ".json"
+    payload = to_jsonable({
+        'meta': meta,
+        'x_param': structured.get('x_param'),
+        'y_param': structured.get('y_param'),
+        'param_ranges': structured.get('param_ranges'),
+        'grid': structured.get('grid'),
+        'best': structured.get('best'),
+        'robustness': structured.get('robustness'),
+        'plateaus': structured.get('plateaus'),
+    })
+    try:
+        with open(sidecar_path, 'w') as handle:
+            json.dump(payload, handle)
+    except Exception as exc:  # noqa: BLE001 - sidecar is a convenience only
+        print(f"Warning: could not write heatmap sidecar ({exc})")
+        return None
+    return sidecar_path
 
 if __name__ == "__main__":
     print_logo()

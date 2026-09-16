@@ -32,7 +32,10 @@ from core.params import (
 )
 
 VALID_INTERVALS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"]
-TOOLS = ["pnl", "chart_analysis", "heatmap", "automator", "fetcher", "series"]
+TOOLS = [
+    "pnl", "chart_analysis", "heatmap", "automator", "fetcher", "series",
+    "plateaus", "validate_plateau", "plot_plateau",
+]
 
 # Keys that are API/tool control parameters, not strategy constructor args.
 _CONTROL_KEYS = {
@@ -41,6 +44,8 @@ _CONTROL_KEYS = {
     "param_ranges", "derived_params", "workers", "no_images", "image", "max_combos",
     "columns", "tail", "format", "inline_max_cells", "pairs", "higher_tf",
     "cache_dir", "output", "resolvers", "resolver_config", "use_config_ranges",
+    "plateau_config", "grid", "grid_path", "region", "windows", "x_param", "y_param",
+    "title",
 }
 
 DEFAULT_SERIES_COLUMNS = [
@@ -433,7 +438,13 @@ def _run_heatmap(params, options):
         derived_params=derived,
         resolvers=resolver_cfg["resolvers"],
         resolver_snippets=resolver_cfg["snippets"],
+        plateau_config=params.get("plateau_config"),
     )
+
+    artifacts = [_artifact(result.get("artifact"))]
+    sidecar = _artifact(result.get("sidecar"))
+    if sidecar:
+        artifacts.append(sidecar)
 
     return {
         "strategy": strategy_class.__name__,
@@ -449,9 +460,145 @@ def _run_heatmap(params, options):
         "grid": to_jsonable(result.get("grid")),
         "best": to_jsonable(result.get("best")),
         "robustness": to_jsonable(result.get("robustness")),
+        "plateaus": to_jsonable(result.get("plateaus")),
+        "sidecar": result.get("sidecar"),
         "fixed_params": to_jsonable(result.get("fixed_params")),
         "warnings": to_jsonable(result.get("warnings") or []),
-    }, [_artifact(result.get("artifact"))]
+    }, artifacts
+
+
+def _ranges_from_grid(grid, x_name="x", y_name="y"):
+    """Derive axis values from a bare grid (fallback when no ranges are given)."""
+    xs, ys = [], []
+    for row in grid or []:
+        if row.get("x") is not None and row["x"] not in xs:
+            xs.append(row["x"])
+        if row.get("y") is not None and row["y"] not in ys:
+            ys.append(row["y"])
+
+    def _sorted(values):
+        try:
+            return sorted(values)
+        except TypeError:
+            return values
+
+    return {x_name: _sorted(xs), y_name: _sorted(ys)}
+
+
+def _plateau_inputs(params, options):
+    """Resolve ``(grid, param_ranges, source)`` from inline grid / sidecar / heatmap."""
+    grid = params.get("grid")
+    param_ranges = params.get("param_ranges")
+    source = "inline-grid"
+    if grid is None and params.get("grid_path"):
+        path = params["grid_path"]
+        if not os.path.isabs(path):
+            path = os.path.join(os.getcwd(), path)
+        with open(path) as handle:
+            payload = json.load(handle)
+        grid = payload.get("grid")
+        param_ranges = param_ranges or payload.get("param_ranges")
+        source = path
+    if grid is None:
+        data, _artifacts = _run_heatmap(params, options)
+        grid = data.get("grid")
+        param_ranges = param_ranges or data.get("param_ranges")
+        source = "heatmap"
+    if not param_ranges:
+        param_ranges = _ranges_from_grid(
+            grid, params.get("x_param", "x"), params.get("y_param", "y"))
+    return grid, param_ranges, source
+
+
+def _run_plateaus(params, options):
+    """Algorithmic plateau detection over an existing grid (no re-backtest)."""
+    from core import plateaus as plateau_analysis
+
+    grid, param_ranges, source = _plateau_inputs(params, options)
+    result = plateau_analysis.detect_plateaus(
+        grid, param_ranges, params.get("plateau_config"))
+    result["source"] = source
+    return result, []
+
+
+def _normalize_region(region):
+    """Accept either a param-ranges spec or a ``best_region`` block."""
+    if (isinstance(region, dict) and isinstance(region.get("x"), dict)
+            and "param" in region["x"] and isinstance(region.get("y"), dict)):
+        x, y = region["x"], region["y"]
+        return {x["param"]: {"min": x["min"], "max": x["max"]},
+                y["param"]: {"min": y["min"], "max": y["max"]}}
+    return region
+
+
+def _run_validate_plateau(params, options):
+    """Re-run the heatmap on walk-forward windows restricted to a region."""
+    region = params.get("region") or params.get("param_ranges")
+    if not region:
+        raise ValueError("validate_plateau needs 'region' or 'param_ranges'")
+    region = _normalize_region(region)
+    start = params.get("start_date")
+    end = params.get("end_date")
+    if not start or not end:
+        raise ValueError("validate_plateau needs 'start_date' and 'end_date'")
+    windows = max(1, int(params.get("windows", 3)))
+    config = params.get("plateau_config")
+
+    edges = np.linspace(np.datetime64(start).astype("int64"),
+                        np.datetime64(end).astype("int64"), windows + 1)
+    results, representatives = [], []
+    for i in range(windows):
+        w0 = str(np.datetime64(int(edges[i]), "D"))
+        w1 = str(np.datetime64(int(edges[i + 1]), "D"))
+        entry = {"window": [w0, w1]}
+        try:
+            data, _artifacts = _run_heatmap({
+                **params, "start_date": w0, "end_date": w1,
+                "param_ranges": region, "plateau_config": config,
+            }, options)
+            analysis = data.get("plateaus") or {}
+            representative = analysis.get("representative")
+            entry.update({
+                "ok": True,
+                "region_count": analysis.get("region_count"),
+                "representative": representative,
+                "region_score": (analysis.get("best_region") or {}).get("region_score"),
+            })
+            if representative and representative.get("x") is not None:
+                representatives.append(representative)
+        except Exception as exc:  # noqa: BLE001 - reported per window
+            entry.update({"ok": False, "error": f"{exc.__class__.__name__}: {exc}"})
+        results.append(entry)
+
+    xs = [r["x"] for r in representatives]
+    ys = [r["y"] for r in representatives]
+    summary = {
+        "windows": windows,
+        "windows_with_plateau": len(representatives),
+        "consistency": (len(representatives) / windows) if windows else 0.0,
+        "representative_mean": {"x": float(np.mean(xs)), "y": float(np.mean(ys))}
+        if representatives else None,
+        "representative_std": {"x": float(np.std(xs)), "y": float(np.std(ys))}
+        if representatives else None,
+    }
+    return {"region": to_jsonable(region), "results": to_jsonable(results),
+            "summary": to_jsonable(summary)}, []
+
+
+def _run_plot_plateau(params, options):
+    """Render a score matrix with region outlines as a presentation PNG."""
+    from core import plateaus as plateau_analysis
+
+    grid, param_ranges, source = _plateau_inputs(params, options)
+    os.makedirs("html_cache", exist_ok=True)
+    path = params.get("output") or os.path.join("html_cache", "plateau_overlay.png")
+    path = path if os.path.isabs(path) else os.path.abspath(path)
+    plateau_analysis.plot_overlay(
+        grid, param_ranges, params.get("plateau_config"), path=path,
+        title=params.get("title") or "Plateau regions")
+    keys = list(param_ranges.keys())
+    return {"source": source, "path": path, "x_param": keys[0],
+            "y_param": keys[1] if len(keys) > 1 else None}, [_artifact(path)]
 
 
 def _run_automator(params, options):
@@ -517,6 +664,9 @@ _DISPATCH = {
     "automator": _run_automator,
     "fetcher": _run_fetcher,
     "series": _run_series,
+    "plateaus": _run_plateaus,
+    "validate_plateau": _run_validate_plateau,
+    "plot_plateau": _run_plot_plateau,
 }
 
 
@@ -697,7 +847,10 @@ def get_schema():
     tools = {
         "pnl": {"description": "PnL analysis for both/long/short directions", "params": {**common_params, "direction": {"enum": ["both", "long", "short"], "default": "both"}}},
         "chart_analysis": {"description": "Interactive chart + trade list + summary", "params": dict(common_params)},
-        "heatmap": {"description": "Parameter grid sweep producing a heatmap", "params": {**common_params, "param_ranges": {"type": "object"}, "derived_params": {"type": "object", "description": "derive params from a swept scale, e.g. KAMA lengths"}, "resolvers": {"type": "object", "description": "generic virtual->concrete parameter resolvers (inline)"}, "resolver_config": {"type": "string", "description": "path to a JSON resolver config"}, "use_config_ranges": {"type": "boolean", "default": False, "description": "inject configured ranges for virtual params not swept explicitly"}, "max_combos": {"type": "integer", "default": 400}, "workers": {"type": "integer"}}},
+        "heatmap": {"description": "Parameter grid sweep producing a heatmap", "params": {**common_params, "param_ranges": {"type": "object"}, "derived_params": {"type": "object", "description": "derive params from a swept scale, e.g. KAMA lengths"}, "resolvers": {"type": "object", "description": "generic virtual->concrete parameter resolvers (inline)"}, "resolver_config": {"type": "string", "description": "path to a JSON resolver config"}, "use_config_ranges": {"type": "boolean", "default": False, "description": "inject configured ranges for virtual params not swept explicitly"}, "plateau_config": {"type": "object", "description": "plateau detection tuning (weights, min_trades, threshold, min_area, representative, ...)"}, "max_combos": {"type": "integer", "default": 400}, "workers": {"type": "integer"}}},
+        "plateaus": {"description": "Algorithmic plateau/region detection over a grid (inline 'grid', 'grid_path' sidecar, or a fresh heatmap)", "params": {**common_params, "grid": {"type": "array", "description": "grid rows from a previous heatmap"}, "grid_path": {"type": "string", "description": "heatmap sidecar JSON (grid + plateaus)"}, "param_ranges": {"type": "object"}, "plateau_config": {"type": "object"}, "x_param": {"type": "string"}, "y_param": {"type": "string"}}},
+        "validate_plateau": {"description": "Walk-forward validation of a parameter region across N time windows", "params": {**common_params, "region": {"type": "object", "description": "param_ranges spec or a heatmap 'best_region' block"}, "param_ranges": {"type": "object"}, "windows": {"type": "integer", "default": 3}, "plateau_config": {"type": "object"}, "max_combos": {"type": "integer", "default": 400}, "workers": {"type": "integer"}}},
+        "plot_plateau": {"description": "Render the score matrix with region outlines to a PNG", "params": {**common_params, "grid": {"type": "array"}, "grid_path": {"type": "string"}, "param_ranges": {"type": "object"}, "plateau_config": {"type": "object"}, "output": {"type": "string"}}},
         "automator": {"description": "Run heatmaps across multiple pairs", "params": {**common_params, "pairs": {"type": "array"}, "higher_tf": {"type": "string", "default": "1d"}, "param_ranges": {"type": "object"}, "derived_params": {"type": "object"}, "resolvers": {"type": "object"}, "resolver_config": {"type": "string"}, "use_config_ranges": {"type": "boolean", "default": False}}},
         "fetcher": {"description": "Ensure/refresh OHLC cache for an asset", "params": {"asset": common_params["asset"], "interval": common_params["interval"]}},
         "series": {"description": "Per-candle indicator/signal series for debugging", "params": {**common_params, "columns": {"type": "array"}, "tail": {"type": "integer"}, "format": {"enum": ["json", "parquet"], "default": "json"}, "inline_max_cells": {"type": "integer", "default": 5000}}},
