@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "snippets": {
+    "all_exact_window": {
+      "op": "scale_window",
+      "base": {"$param": "base"},
+      "k": {"$param": "k"}
+    },
+    "all_exact_alpha": {
+      "op": "scale_alpha",
+      "base": {"$param": "base"},
+      "k": {"$param": "k"}
+    }
+  },
+  "virtual_params": {
+    "kama_normalized_length": {
+      "description": "KAMA scaling axis (all_exact): length'=k*L, fast'/slow'=k*(P+1)-1",
+      "range": {"min": 1, "max": 8, "step": 1}
+    }
+  },
+  "resolvers": [
+    {
+      "id": "kama_normalized_length",
+      "when": {"strategy": ["LiveKAMASSLStrategy"]},
+      "input": "kama_normalized_length",
+      "warmup_targets": ["entry_kama_slow", "kama2_slow", "exit_kama_slow"],
+      "outputs": {
+        "entry_kama_length": {"$snippet": "all_exact_window", "args": {"base": 16, "k": {"$input": true}}},
+        "entry_kama_fast":   {"$snippet": "all_exact_alpha",  "args": {"base": 4,  "k": {"$input": true}}},
+        "entry_kama_slow":   {"$snippet": "all_exact_alpha",  "args": {"base": 24, "k": {"$input": true}}},
+        "kama2_length":      {"$snippet": "all_exact_window", "args": {"base": 15, "k": {"$input": true}}},
+        "kama2_fast":        {"$snippet": "all_exact_alpha",  "args": {"base": 3,  "k": {"$input": true}}},
+        "kama2_slow":        {"$snippet": "all_exact_alpha",  "args": {"base": 22, "k": {"$input": true}}},
+        "exit_kama_length":  {"$snippet": "all_exact_window", "args": {"base": 14, "k": {"$input": true}}},
+        "exit_kama_fast":    {"$snippet": "all_exact_alpha",  "args": {"base": 2,  "k": {"$input": true}}},
+        "exit_kama_slow":    {"$snippet": "all_exact_alpha",  "args": {"base": 20, "k": {"$input": true}}}
+      }
+    },
+    {
+      "id": "slow_kama_normalized_length",
+      "when": {"strategy": ["DMXStrategy"]},
+      "input": "kama_normalized_length",
+      "warmup_targets": ["slow_kama_slow"],
+      "outputs": {
+        "slow_kama_length": {"$snippet": "all_exact_window", "args": {"base": 500, "k": {"$input": true}}},
+        "slow_kama_fast":   {"$snippet": "all_exact_alpha",  "args": {"base": 24,  "k": {"$input": true}}},
+        "slow_kama_slow":   {"$snippet": "all_exact_alpha",  "args": {"base": 360, "k": {"$input": true}}}
+      }
+    }
+  ]
+}

@@ -50,6 +50,18 @@ TEST_PY = os.path.join(PROJECT_ROOT, "test.py")
 DEFAULT_TIMEOUT = int(os.environ.get("HEATMAP_MCP_TIMEOUT", "1500"))
 ARTIFACT_DIRS = ["html_cache", "automator_html", "series_cache", "pnl_cache"]
 
+# Tools that are offloaded to the home server instead of running in this
+# container.  The container has no ssh/rsync, so the job is handed to a
+# host-side watcher (scripts/remote_watcher.py) through the bind-mounted
+# .remote_jobs directory; the watcher runs scripts/remote.py and returns the
+# JSON envelope.
+REMOTE_TOOLS = {
+    t.strip()
+    for t in os.environ.get("HEATMAP_MCP_REMOTE_TOOLS", "heatmap,automator").split(",")
+    if t.strip()
+}
+JOBS_DIR = os.environ.get("HEATMAP_JOBS_DIR", os.path.join(PROJECT_ROOT, ".remote_jobs"))
+
 mcp = _Server("damians-heatmap")
 
 
@@ -65,9 +77,56 @@ def _fmt_arg(key, value):
     return f"--{key}={value}"
 
 
+def _call_remote(tool, params, timeout=None):
+    """Offload a tool to the home server via the host-side job watcher.
+
+    Writes a job file into the bind-mounted ``.remote_jobs/incoming`` directory
+    and polls ``.remote_jobs/done/<id>/result.json`` for the JSON envelope.
+    """
+    import time
+    import uuid
+
+    incoming = os.path.join(JOBS_DIR, "incoming")
+    done = os.path.join(JOBS_DIR, "done")
+    os.makedirs(incoming, exist_ok=True)
+    os.makedirs(done, exist_ok=True)
+
+    job_id = f"{tool}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    args = [_fmt_arg(key, value) for key, value in params.items()]
+    job = {"id": job_id, "tool": tool, "args": args, "created_at": time.time()}
+
+    tmp = os.path.join(incoming, job_id + ".json.tmp")
+    with open(tmp, "w") as handle:
+        json.dump(job, handle)
+    os.replace(tmp, os.path.join(incoming, job_id + ".json"))
+
+    limit = timeout or DEFAULT_TIMEOUT
+    deadline = time.time() + limit
+    result_path = os.path.join(done, job_id, "result.json")
+    while time.time() < deadline:
+        if os.path.exists(result_path):
+            try:
+                with open(result_path) as handle:
+                    return json.load(handle)
+            except (json.JSONDecodeError, OSError):
+                pass
+        time.sleep(0.5)
+
+    return {
+        "ok": False,
+        "tool": tool,
+        "error": (
+            f"remote job {job_id} timed out after {limit}s "
+            "(is scripts/remote_watcher.py running on the host?)"
+        ),
+    }
+
+
 def _call(tool, params, timeout=None):
     """Run ``test.py <tool> ... --api`` and return the parsed JSON envelope."""
     clean = {k: v for k, v in (params or {}).items() if v is not None}
+    if tool != "schema" and tool in REMOTE_TOOLS:
+        return _call_remote(tool, clean, timeout)
     if tool == "schema":
         args = [PYTHON, TEST_PY, "--schema", "--api"]
     else:
@@ -159,38 +218,74 @@ def run_chart_analysis(asset: str, strategy: str, start_date: str = None,
 
 @mcp.tool()
 def run_heatmap(asset: str, strategy: str, param_ranges: dict = None,
+                derived_params: dict = None,
+                resolvers: dict = None, resolver_config: str = None,
+                use_config_ranges: bool = False,
                 start_date: str = None, end_date: str = None, interval: str = "4h",
                 initial_equity: float = 10000, fee_pct: float = 0.04,
-                workers: int = None, no_images: bool = True,
+                workers: int = None,
                 max_combos: int = 400, params: dict = None,
                 timeout: int = None) -> dict:
     """Sweep a parameter grid. Returns grid, best cells, robustness and HTML URL.
 
-    ``param_ranges`` maps a parameter to either a list of values or a spec like
+    ``param_ranges`` maps a parameter to a list of values or a spec like
     ``{"min": 0.1, "max": 1.0, "step": 0.1}`` (or ``{"count": 5}``).
+
+    **Virtual parameters (recommended for KAMA).**  The default resolver config
+    (``configs/param_resolvers.json``) exposes the virtual axis
+    ``kama_normalized_length``, resolved with the *all_exact* rule
+    (``length' = k*L``, ``fast'/slow' = k*(P+1)-1``) into
+    ``entry_kama_length/fast/slow``, ``kama2_*``, ``exit_kama_*``
+    (LiveKAMASSLStrategy) or ``slow_kama_length/fast/slow`` (DMXStrategy).  Sweep
+    it like any parameter::
+
+        run_heatmap(
+            asset="BTCUSDT", strategy="LiveKAMASSLStrategy",
+            start_date="2024-01-01", end_date="2024-06-01",
+            param_ranges={
+                "kama_normalized_length": {"min": 1, "max": 8, "step": 1},
+                "entry_filter": {"min": 0.5, "max": 1.5, "step": 0.25},
+            },
+        )
+
+    Use the range declared in the config with ``{"kama_normalized_length":
+    "config"}``, or auto-inject configured virtual ranges with
+    ``use_config_ranges=True``.  ``resolvers`` overrides the config inline and
+    ``resolver_config`` points at a different JSON file.  Applied resolvers are
+    returned in ``data.resolvers``; see ``docs/parameter-resolution-suite.md``.
+
+    ``derived_params`` is the older KAMA-only variant, e.g.
+    ``{"entry_kama_length": {"scale": "kama_scale", "base": 16, "kind": "window"}}``.
     """
     return _call("heatmap", _merge(
         params, asset=asset, strategy=strategy, param_ranges=param_ranges,
+        derived_params=derived_params, resolvers=resolvers,
+        resolver_config=resolver_config, use_config_ranges=use_config_ranges,
         start_date=start_date, end_date=end_date, interval=interval,
         initial_equity=initial_equity, fee_pct=fee_pct,
-        workers=workers, no_images=no_images, max_combos=max_combos,
+        workers=workers, max_combos=max_combos,
     ), timeout=timeout)
 
 
 @mcp.tool()
 def run_automator(strategy: str, pairs: list = None, param_ranges: dict = None,
+                  derived_params: dict = None,
+                  resolvers: dict = None, resolver_config: str = None,
+                  use_config_ranges: bool = False,
                   start_date: str = None, end_date: str = None,
                   interval: str = "4h", higher_tf: str = "1d",
                   initial_equity: float = 1000, fee_pct: float = 0.04,
-                  workers: int = None, no_images: bool = True,
+                  workers: int = None,
                   max_combos: int = 400, params: dict = None,
                   timeout: int = None) -> dict:
     """Run the heatmap across multiple pairs. Returns per-pair results."""
     return _call("automator", _merge(
         params, strategy=strategy, pairs=pairs, param_ranges=param_ranges,
+        derived_params=derived_params, resolvers=resolvers,
+        resolver_config=resolver_config, use_config_ranges=use_config_ranges,
         start_date=start_date, end_date=end_date, interval=interval,
         higher_tf=higher_tf, initial_equity=initial_equity, fee_pct=fee_pct,
-        workers=workers, no_images=no_images, max_combos=max_combos,
+        workers=workers, max_combos=max_combos,
     ), timeout=timeout)
 
 

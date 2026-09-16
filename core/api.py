@@ -23,6 +23,13 @@ import numpy as np
 import pandas as pd
 
 from core.serialize import to_jsonable, trades_to_records
+from core.kama_scaling import normalize_derived
+from core.params import (
+    applicable_virtual_params,
+    describe_resolvers,
+    load_resolver_config,
+    resolver_applies,
+)
 
 VALID_INTERVALS = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"]
 TOOLS = ["pnl", "chart_analysis", "heatmap", "automator", "fetcher", "series"]
@@ -31,9 +38,9 @@ TOOLS = ["pnl", "chart_analysis", "heatmap", "automator", "fetcher", "series"]
 _CONTROL_KEYS = {
     "asset", "interval", "start_date", "end_date", "strategy", "tool",
     "initial_equity", "fee_pct", "direction", "trade_direction",
-    "param_ranges", "workers", "no_images", "image", "max_combos",
+    "param_ranges", "derived_params", "workers", "no_images", "image", "max_combos",
     "columns", "tail", "format", "inline_max_cells", "pairs", "higher_tf",
-    "cache_dir", "output",
+    "cache_dir", "output", "resolvers", "resolver_config", "use_config_ranges",
 }
 
 DEFAULT_SERIES_COLUMNS = [
@@ -138,31 +145,65 @@ def _clean_range(values, precision=6):
     return out
 
 
-def _parse_param_ranges(param_ranges, strategy_class, max_combos):
+_CONFIG_RANGE_TOKENS = {"config", "@config", "default", "@default"}
+
+
+def _configured_range(name, virtual_defaults):
+    meta = (virtual_defaults or {}).get(name)
+    if not meta or "range" not in meta:
+        raise ValueError(
+            f"'{name}' asked for its configured range, but the resolver config defines none")
+    return meta["range"]
+
+
+def _spec_to_values(name, spec, virtual_defaults=None):
+    """Turn a range spec into a numpy array of values.
+
+    Accepts a list, ``{"min","max","step"}`` / ``{"min","max","count"}`` /
+    ``{"values": [...]}``, or the tokens ``"config"`` / ``{"$config": true}``
+    to use the range declared in the resolver config for that parameter.
+    """
+    if isinstance(spec, str) and spec.strip().lower() in _CONFIG_RANGE_TOKENS:
+        spec = _configured_range(name, virtual_defaults)
+    if isinstance(spec, dict):
+        if spec.get("$config"):
+            spec = _configured_range(name, virtual_defaults)
+        elif "values" in spec:
+            return np.asarray(spec["values"])
+        else:
+            start = spec.get("min", spec.get("start"))
+            stop = spec.get("max", spec.get("stop"))
+            if start is None or stop is None:
+                raise ValueError(f"Range for '{name}' needs 'min' and 'max'")
+            step = spec.get("step")
+            if step in (None, 0):
+                count = int(spec.get("count", spec.get("num", 5)))
+                return np.linspace(start, stop, count)
+            return np.arange(start, stop + step, step)
+    if isinstance(spec, (list, tuple)):
+        return np.asarray(spec)
+    return np.asarray([spec])
+
+
+def _parse_param_ranges(param_ranges, strategy_class, max_combos,
+                        virtual_defaults=None, use_config_ranges=False):
     if param_ranges:
-        ranges = {}
-        for name, spec in param_ranges.items():
-            if isinstance(spec, dict):
-                start = spec.get("min", spec.get("start"))
-                stop = spec.get("max", spec.get("stop"))
-                if start is None or stop is None:
-                    raise ValueError(f"Range for '{name}' needs 'min' and 'max'")
-                step = spec.get("step")
-                if step in (None, 0):
-                    count = int(spec.get("count", spec.get("num", 5)))
-                    ranges[name] = np.linspace(start, stop, count)
-                else:
-                    ranges[name] = np.arange(start, stop + step, step)
-            elif isinstance(spec, (list, tuple)):
-                ranges[name] = np.asarray(spec)
-            else:
-                ranges[name] = np.asarray([spec])
+        ranges = {
+            name: _spec_to_values(name, spec, virtual_defaults)
+            for name, spec in param_ranges.items()
+        }
     else:
         default = strategy_class.get_parameter_ranges() or {}
         keys = list(default.keys())[:2]
-        if not keys:
+        if not keys and not (use_config_ranges and virtual_defaults):
             raise ValueError("Strategy defines no parameter ranges; pass 'param_ranges'")
         ranges = {k: np.asarray(default[k]) for k in keys}
+
+    # Optionally inject configured ranges for virtual params not swept explicitly.
+    if use_config_ranges and virtual_defaults:
+        for name, meta in virtual_defaults.items():
+            if name not in ranges and "range" in meta:
+                ranges[name] = _spec_to_values(name, meta["range"], virtual_defaults)
 
     total = 1
     for values in ranges.values():
@@ -173,6 +214,88 @@ def _parse_param_ranges(param_ranges, strategy_class, max_combos):
             f"Pass a smaller 'param_ranges' or raise 'max_combos'."
         )
     return ranges
+
+
+def _virtual_alias_map(resolver_cfg, strategy_name):
+    """Map resolver ids -> canonical virtual input, for resolvers that apply."""
+    alias = {}
+    for resolver in resolver_cfg["resolvers"]:
+        if resolver["id"] != resolver["input"] and resolver_applies(resolver, strategy_name):
+            alias[resolver["id"]] = resolver["input"]
+    return alias
+
+
+def _normalize_virtual_ranges(ranges, alias_map, resolver_cfg, strategy_name):
+    """Rename resolver-id aliases to the canonical virtual input and reject
+    virtual params that no resolver would resolve for this strategy."""
+    normalized = {}
+    conversions = {}
+    for key, values in ranges.items():
+        canonical = alias_map.get(key, key)
+        if canonical != key:
+            if canonical in ranges:
+                raise ValueError(
+                    f"'{key}' is an alias of '{canonical}'; sweep only one of them")
+            conversions[key] = canonical
+        if canonical in normalized:
+            raise ValueError(f"duplicate parameter '{canonical}'")
+        normalized[canonical] = values
+
+    virtual_inputs = {r["input"] for r in resolver_cfg["resolvers"]}
+    applicable = {r["input"] for r in resolver_cfg["resolvers"]
+                  if resolver_applies(r, strategy_name)}
+    for key in normalized:
+        if key in virtual_inputs and key not in applicable:
+            raise ValueError(
+                f"'{key}' is a virtual parameter, but no resolver applies to strategy "
+                f"'{strategy_name}'. Add a resolver with a matching 'when', or use a "
+                f"strategy that has one.")
+    return normalized, conversions
+
+
+def _normalize_derived_names(derived_params, alias_map):
+    """Rewrite derived params (target names and 'scale' keys) through the alias map."""
+    if not derived_params:
+        return derived_params
+    out = {}
+    for name, spec in derived_params.items():
+        spec = dict(spec)
+        if spec.get("scale") in alias_map:
+            spec["scale"] = alias_map[spec["scale"]]
+        out[alias_map.get(name, name)] = spec
+    return out
+
+
+def prepare_heatmap_params(params, strategy_class, max_combos):
+    """Load resolvers, parse/normalize the grid and derive params cleanly.
+
+    Resolver-id aliases are rewritten to their canonical virtual input (both in
+    ``param_ranges`` and in ``derived_params``), so a caller may sweep the
+    friendly id (e.g. ``slow_kama_normalized_length``) and it is converted to
+    the virtual input (``kama_normalized_length``).  Virtual parameters that no
+    resolver would resolve for this strategy raise a clear error instead of
+    silently producing identical grid cells.
+    """
+    resolver_cfg = load_resolver_config(
+        path=params.get("resolver_config"), inline=params.get("resolvers"))
+    name = strategy_class.__name__
+    virtual_defaults = applicable_virtual_params(
+        resolver_cfg["virtual_params"], resolver_cfg["resolvers"], name)
+    ranges = _parse_param_ranges(
+        params.get("param_ranges"), strategy_class, max_combos,
+        virtual_defaults=virtual_defaults,
+        use_config_ranges=bool(params.get("use_config_ranges", False)))
+    alias_map = _virtual_alias_map(resolver_cfg, name)
+    ranges, conversions = _normalize_virtual_ranges(
+        ranges, alias_map, resolver_cfg, name)
+    derived = normalize_derived(
+        _normalize_derived_names(params.get("derived_params"), alias_map), ranges)
+    return {
+        "resolver_cfg": resolver_cfg,
+        "ranges": ranges,
+        "derived": derived,
+        "conversions": conversions,
+    }
 
 
 def _artifact(path):
@@ -284,7 +407,10 @@ def _run_heatmap(params, options):
     data = timeframe_data["primary"]["data"]
 
     max_combos = int(params.get("max_combos", options.get("max_combos", 400)))
-    ranges = _parse_param_ranges(params.get("param_ranges"), strategy_class, max_combos)
+    prep = prepare_heatmap_params(params, strategy_class, max_combos)
+    resolver_cfg = prep["resolver_cfg"]
+    ranges = prep["ranges"]
+    derived = prep["derived"]
 
     lookback, end_lookback = _lookback_candles(
         data, params.get("start_date"), params.get("end_date")
@@ -304,7 +430,9 @@ def _run_heatmap(params, options):
         start_date=params.get("start_date"),
         end_date=params.get("end_date"),
         workers=params.get("workers", options.get("workers")),
-        no_images=bool(params.get("no_images", options.get("no_images", False))),
+        derived_params=derived,
+        resolvers=resolver_cfg["resolvers"],
+        resolver_snippets=resolver_cfg["snippets"],
     )
 
     return {
@@ -314,10 +442,15 @@ def _run_heatmap(params, options):
         "x_param": result.get("x_param"),
         "y_param": result.get("y_param"),
         "param_ranges": to_jsonable(result.get("param_ranges")),
+        "param_aliases": to_jsonable(prep["conversions"]),
+        "derived_params": to_jsonable(derived),
+        "resolvers": describe_resolvers(
+            resolver_cfg["resolvers"], resolver_cfg["snippets"], resolver_cfg["virtual_params"]),
         "grid": to_jsonable(result.get("grid")),
         "best": to_jsonable(result.get("best")),
         "robustness": to_jsonable(result.get("robustness")),
         "fixed_params": to_jsonable(result.get("fixed_params")),
+        "warnings": to_jsonable(result.get("warnings") or []),
     }, [_artifact(result.get("artifact"))]
 
 
@@ -338,9 +471,12 @@ def _run_automator(params, options):
         "start_date": params.get("start_date"),
         "end_date": params.get("end_date"),
         "param_ranges": params.get("param_ranges"),
+        "derived_params": params.get("derived_params"),
+        "resolvers": params.get("resolvers"),
+        "resolver_config": params.get("resolver_config"),
+        "use_config_ranges": params.get("use_config_ranges"),
         "max_combos": params.get("max_combos", options.get("max_combos", 400)),
         "workers": params.get("workers", options.get("workers")),
-        "no_images": bool(params.get("no_images", options.get("no_images", False))),
     })
 
     artifacts = [_artifact(result.get("log_file"))]
@@ -415,6 +551,8 @@ def run_tool(tool, params=None, options=None, suppress=True):
             data, artifacts = runner(params, options)
         envelope["data"] = to_jsonable(data)
         envelope["artifacts"] = [a for a in artifacts if a]
+        if isinstance(data, dict) and data.get("warnings"):
+            envelope["warnings"] = to_jsonable(data["warnings"])
         envelope["ok"] = True
     except Exception as exc:  # noqa: BLE001 - surfaced to the caller as JSON
         import traceback
@@ -559,8 +697,8 @@ def get_schema():
     tools = {
         "pnl": {"description": "PnL analysis for both/long/short directions", "params": {**common_params, "direction": {"enum": ["both", "long", "short"], "default": "both"}}},
         "chart_analysis": {"description": "Interactive chart + trade list + summary", "params": dict(common_params)},
-        "heatmap": {"description": "Parameter grid sweep producing a heatmap", "params": {**common_params, "param_ranges": {"type": "object"}, "max_combos": {"type": "integer", "default": 400}, "workers": {"type": "integer"}, "no_images": {"type": "boolean", "default": False}}},
-        "automator": {"description": "Run heatmaps across multiple pairs", "params": {**common_params, "pairs": {"type": "array"}, "higher_tf": {"type": "string", "default": "1d"}, "param_ranges": {"type": "object"}}},
+        "heatmap": {"description": "Parameter grid sweep producing a heatmap", "params": {**common_params, "param_ranges": {"type": "object"}, "derived_params": {"type": "object", "description": "derive params from a swept scale, e.g. KAMA lengths"}, "resolvers": {"type": "object", "description": "generic virtual->concrete parameter resolvers (inline)"}, "resolver_config": {"type": "string", "description": "path to a JSON resolver config"}, "use_config_ranges": {"type": "boolean", "default": False, "description": "inject configured ranges for virtual params not swept explicitly"}, "max_combos": {"type": "integer", "default": 400}, "workers": {"type": "integer"}}},
+        "automator": {"description": "Run heatmaps across multiple pairs", "params": {**common_params, "pairs": {"type": "array"}, "higher_tf": {"type": "string", "default": "1d"}, "param_ranges": {"type": "object"}, "derived_params": {"type": "object"}, "resolvers": {"type": "object"}, "resolver_config": {"type": "string"}, "use_config_ranges": {"type": "boolean", "default": False}}},
         "fetcher": {"description": "Ensure/refresh OHLC cache for an asset", "params": {"asset": common_params["asset"], "interval": common_params["interval"]}},
         "series": {"description": "Per-candle indicator/signal series for debugging", "params": {**common_params, "columns": {"type": "array"}, "tail": {"type": "integer"}, "format": {"enum": ["json", "parquet"], "default": "json"}, "inline_max_cells": {"type": "integer", "default": 5000}}},
     }
@@ -597,10 +735,20 @@ def get_schema():
     except Exception as exc:  # noqa: BLE001
         strategies = {"_error": str(exc)}
 
+    # Default parameter-resolution config: which virtual parameters exist and
+    # what they resolve into (so agents can discover e.g. kama_normalized_length).
+    try:
+        cfg = load_resolver_config(use_default=True)
+        resolvers_info = describe_resolvers(
+            cfg["resolvers"], cfg["snippets"], cfg["virtual_params"])
+    except Exception as exc:  # noqa: BLE001
+        resolvers_info = {"_error": str(exc)}
+
     return {
         "tools": tools,
         "intervals": VALID_INTERVALS,
         "strategies": strategies,
+        "resolvers": resolvers_info,
         "envelope": {
             "ok": "boolean",
             "tool": "string",

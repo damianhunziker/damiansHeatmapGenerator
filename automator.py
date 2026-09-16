@@ -76,17 +76,20 @@ def run_heatmap_for_pairs(params=None):
     initial_equity = params.get('initial_equity', 1000)
     fee_pct = params.get('fee_pct', 0.04)
     workers = params.get('workers')
-    no_images = bool(params.get('no_images', False))
     archive = params.get('archive', interactive)
 
     # Get parameter ranges
     if interactive:
         param_ranges = get_parameter_ranges(strategy_class)
+        derived_params = None
+        resolver_cfg = {"resolvers": [], "snippets": {}}
     else:
-        from core.api import _parse_param_ranges
-        param_ranges = _parse_param_ranges(
-            params.get('param_ranges'), strategy_class, int(params.get('max_combos', 400))
-        )
+        from core.api import prepare_heatmap_params
+        prep = prepare_heatmap_params(
+            params, strategy_class, int(params.get('max_combos', 400)))
+        resolver_cfg = prep['resolver_cfg']
+        param_ranges = prep['ranges']
+        derived_params = prep['derived']
 
     # Create timestamp for the run
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -163,7 +166,9 @@ def run_heatmap_for_pairs(params=None):
                 start_date=start_date,
                 end_date=end_date,
                 workers=workers,
-                no_images=no_images
+                derived_params=derived_params,
+                resolvers=resolver_cfg["resolvers"],
+                resolver_snippets=resolver_cfg["snippets"],
             )
 
             run['ok'] = True

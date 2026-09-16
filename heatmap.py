@@ -2,6 +2,8 @@ import altair as alt
 import pandas as pd
 import numpy as np
 from core.strategy_utils import get_user_inputs, fetch_data, get_parameter_ranges, print_logo, create_performance_chart, instantiate_strategy
+from core.kama_scaling import expand_derived, max_effective_period
+from core.params import resolve_params, resolver_max_period
 from core.html_viewer import publish_file, print_viewer_info
 from classes.trade_analyzer import TradeAnalyzer
 import itertools
@@ -11,7 +13,7 @@ import os
 import altair_saver
 import matplotlib.pyplot as plt
 
-def analyze_strategy(params, timeframe_data, strategy_class, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, param_ranges, start_date=None, end_date=None):
+def analyze_strategy(params, timeframe_data, strategy_class, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, param_ranges, start_date=None, end_date=None, derived_params=None, resolvers=None, resolver_snippets=None):
     """Analyze strategy with given parameters"""
     # Initialize strategy with parameters
     strategy_params = dict(zip(param_ranges.keys(), params))
@@ -19,6 +21,16 @@ def analyze_strategy(params, timeframe_data, strategy_class, initial_equity, fee
         'initial_equity': initial_equity,
         'fee_pct': fee_pct
     })
+
+    # Generic, config-driven parameter resolution (virtual -> concrete params)
+    if resolvers:
+        strategy_params = resolve_params(
+            strategy_params, resolvers,
+            strategy=strategy_class.__name__, snippets=resolver_snippets)
+
+    # Expand derived parameters (e.g. KAMA lengths scaled from a single axis)
+    if derived_params:
+        strategy_params = expand_derived(strategy_params, derived_params)
     
     # Initialize strategy with timeframe data
     strategy = instantiate_strategy(strategy_class, strategy_params)
@@ -210,7 +222,7 @@ def _build_structured_results(df, param_ranges):
     }
 
 
-def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, interval, asset, strategy_name, start_date=None, end_date=None, workers=None, no_images=False):
+def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity, fee_pct, last_n_candles_analyze, last_n_candles_display, interval, asset, strategy_name, start_date=None, end_date=None, workers=None, derived_params=None, resolvers=None, resolver_snippets=None):
     """Creates a heatmap of strategy results for different parameter combinations.
 
     Returns a dict with the parameter grid (one entry per combination), the
@@ -234,9 +246,32 @@ def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity,
     
     print(f"\nThere are {len(param_combinations)} possible parameter combinations.")
 
+    # Warmup warning: KAMA needs ~6x its longest period of bars to converge.
+    warnings = []
+    max_period = 0
+    if derived_params:
+        max_period = max(max_period, max_effective_period(
+            param_ranges, derived_params, name_filter=lambda n: 'kama' in n.lower()
+        ))
+    if resolvers:
+        max_period = max(max_period, resolver_max_period(
+            param_ranges, resolvers, snippets=resolver_snippets
+        ))
+    if max_period:
+        available = len(data) - (last_n_candles_analyze or 0)
+        required = 6 * max_period
+        if available < required:
+            warnings.append(
+                f"KAMA warmup may be insufficient: longest period {max_period} needs "
+                f"~{required} bars before the analysis window, but only {available} are "
+                f"available. Early signals may be unreliable."
+            )
+            print(f"WARNING: {warnings[-1]}")
+
     args_list = [(params, timeframe_data, strategy_class, initial_equity, fee_pct, 
                  last_n_candles_analyze, last_n_candles_display, param_ranges, 
-                 start_date, end_date) for params in param_combinations]
+                 start_date, end_date, derived_params, resolvers, resolver_snippets)
+                 for params in param_combinations]
     results = _pool_map(analyze_strategy_wrapper, args_list, workers, "Analyzing strategies")
     
     # Ensure the pnl_cache directory exists
@@ -248,14 +283,11 @@ def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity,
         for idx, (params, result) in enumerate(zip(param_combinations, results))
     ]
     
-    # Generate images in parallel (skipped in API mode via no_images)
-    if no_images:
-        image_paths = {}
-    else:
-        print("\nGenerating PnL images...")
-        image_results = _pool_map(generate_pnl_image, image_args, workers, "Creating PnL images")
-        # Update image paths to use relative path from html directory
-        image_paths = {idx: f"pnl_images/{os.path.basename(path)}" for idx, path in image_results}
+    # Generate the per-cell PnL images (always on: drives the HTML hover overlay)
+    print("\nGenerating PnL images...")
+    image_results = _pool_map(generate_pnl_image, image_args, workers, "Creating PnL images")
+    # Update image paths to use relative path from html directory
+    image_paths = {idx: f"pnl_images/{os.path.basename(path)}" for idx, path in image_results}
     
     # Create HTML image elements
     image_elements = ""
@@ -288,6 +320,7 @@ def create_heatmap(timeframe_data, strategy_class, param_ranges, initial_equity,
 
     # Structured results for the machine-readable API (see core/api.py)
     structured = _build_structured_results(df, param_ranges)
+    structured['warnings'] = warnings
 
     # Determine color scale domains (using all combinations)
     profit_domain = [df['profit'].min(), df['profit'].max()]
