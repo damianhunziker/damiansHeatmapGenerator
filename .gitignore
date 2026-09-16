@@ -12,6 +12,7 @@ classes/indicators/*
 /live_strategies/
 /test/
 .docker-data/
+.remote_jobs/
 .env
 ibkr/tws_settings/
 ibkr/secrets/
