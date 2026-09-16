@@ -29,6 +29,16 @@ class SMACrossoverStrategy(BaseStrategy):
         return {
             'primary': '4h',    # Main trading timeframe
         }
+
+    def get_indicator_subplots(self):
+        """Declare the SMA subplot so chart_analysis reserves a row for it."""
+        return [{
+            'title': 'SMA Crossover',
+            'traces': [
+                {'column': 'fast_sma', 'name': f'Fast SMA ({self.fast_length})', 'color': 'blue'},
+                {'column': 'slow_sma', 'name': f'Slow SMA ({self.slow_length})', 'color': 'red'},
+            ],
+        }]
     
     def calculate_sma(self, data, length):
         """Calculate Simple Moving Average"""
