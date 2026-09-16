@@ -27,7 +27,7 @@ Configuration (environment variables)::
     HEATMAP_REMOTE_ENGINE     default "podman"
     HEATMAP_REMOTE_CONTAINER  default "damians-heatmap-dev"
     HEATMAP_REMOTE_IMAGE      default "damians-heatmap-generator:dev"
-    HEATMAP_REMOTE_WORKERS    default "26"  (hard cap on the pool for heatmap/automator)
+    HEATMAP_REMOTE_WORKERS    optional override; default = remote CPU count (nproc)
 """
 
 from __future__ import annotations
@@ -45,10 +45,10 @@ REMOTE_DIR = os.environ.get("HEATMAP_REMOTE_DIR", "/data/home/projects/heatmap")
 ENGINE = os.environ.get("HEATMAP_REMOTE_ENGINE", "podman")
 CONTAINER = os.environ.get("HEATMAP_REMOTE_CONTAINER", "damians-heatmap-dev")
 IMAGE = os.environ.get("HEATMAP_REMOTE_IMAGE", "damians-heatmap-generator:dev")
-# Hard cap on the multiprocessing pool size for heatmap/automator on the home
-# server.  Applied both as the default and as an upper bound for an explicit
-# ``--workers`` value, so a run can never oversubscribe the host.
-DEFAULT_WORKERS = os.environ.get("HEATMAP_REMOTE_WORKERS", "26")
+# Optional override for the multiprocessing pool size on the home server.  When
+# unset, the remote host's CPU count (``nproc``) is used.
+WORKERS_OVERRIDE = os.environ.get("HEATMAP_REMOTE_WORKERS")
+_WORKERS_CACHE = None
 
 CONTAINER_ROOT = "/app"
 
@@ -221,48 +221,66 @@ def cmd_sync_ohlc() -> int:
     return 0
 
 
-def _workers_cap():
-    if not DEFAULT_WORKERS:
-        return None
-    try:
-        return int(DEFAULT_WORKERS)
-    except ValueError:
-        return None
+def _remote_workers():
+    """Worker count for remote heatmap/automator runs.
+
+    ``HEATMAP_REMOTE_WORKERS`` overrides; otherwise the remote host's CPU count
+    (``nproc``) is used, detected once per process.
+    """
+    global _WORKERS_CACHE
+    if WORKERS_OVERRIDE:
+        try:
+            return max(1, int(WORKERS_OVERRIDE))
+        except ValueError:
+            pass
+    if _WORKERS_CACHE is None:
+        try:
+            _WORKERS_CACHE = max(1, int((ssh_out("nproc") or "").strip()))
+        except (TypeError, ValueError):
+            _WORKERS_CACHE = 4
+    return _WORKERS_CACHE
+
+
+def _requested_workers(args):
+    for i, arg in enumerate(args):
+        if arg.startswith("--workers="):
+            return arg.split("=", 1)[1]
+        if arg == "--workers" and i + 1 < len(args):
+            return args[i + 1]
+    return None
+
+
+def _strip_workers(args):
+    out = []
+    i = 0
+    while i < len(args):
+        if args[i].startswith("--workers="):
+            i += 1
+            continue
+        if args[i] == "--workers" and i + 1 < len(args):
+            i += 2
+            continue
+        out.append(args[i])
+        i += 1
+    return out
 
 
 def _inject_workers(tool: str, args: list[str]) -> list[str]:
-    """Set/clamp ``--workers`` for heatmap/automator to the configured cap."""
+    """Force ``--workers`` to the remote CPU count for heatmap/automator.
+
+    A client-provided value is ignored on purpose: the home server decides how
+    many CPUs to use, so a low value from a caller cannot leave most cores idle.
+    """
     if tool not in ("heatmap", "automator"):
         return args
 
-    cap = _workers_cap()
-    out = list(args)
+    workers = _remote_workers()
+    requested = _requested_workers(args)
+    if requested is not None and requested != str(workers):
+        info(f"workers forced {requested} -> {workers} (remote CPU count)")
 
-    for i, arg in enumerate(out):
-        if arg.startswith("--workers="):
-            raw = arg.split("=", 1)[1]
-            if cap is not None:
-                try:
-                    value = int(raw)
-                except ValueError:
-                    return out
-                if value > cap:
-                    info(f"workers capped {value} -> {cap}")
-                    out[i] = f"--workers={cap}"
-            return out
-        if arg == "--workers" and i + 1 < len(out):
-            if cap is not None:
-                try:
-                    value = int(out[i + 1])
-                except ValueError:
-                    return out
-                if value > cap:
-                    info(f"workers capped {value} -> {cap}")
-                    out[i + 1] = str(cap)
-            return out
-
-    if cap:
-        out.append(f"--workers={cap}")
+    out = _strip_workers(list(args))
+    out.append(f"--workers={workers}")
     return out
 
 
